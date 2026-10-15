@@ -5,7 +5,7 @@ import time
 from falkordb import Graph
 
 from ..db import get_graph
-from .catalog import DATA_ACCESS, DATABASES, OBSERVABILITY, ON_CALL, PEOPLE, SERVICES, TEAMS
+from .catalog import DATA_ACCESS, DATABASES, OBSERVABILITY, ON_CALL, PEOPLE, REVENUE_PER_MIN, SERVICES, TEAMS
 from .history import build_history
 from .indexes import create_indexes
 from .memory import build_memory
@@ -70,10 +70,10 @@ def build_topology(graph: Graph, rng: random.Random, now: int) -> None:
     graph.query(
         "UNWIND $rows AS r MATCH (t:Team {uid: 'team:' + r.team}) "
         "CREATE (t)-[:OWNS]->(:Service {uid: 'svc:' + r.name, name: r.name, tier: r.tier, layer: r.layer, "
-        "language: r.lang, version: r.version, status: 'healthy'})",
+        "language: r.lang, version: r.version, status: 'healthy', revenue_per_min: r.revenue})",
         {
             "rows": [
-                {"name": n, "team": t, "tier": tier, "layer": layer, "lang": lang,
+                {"name": n, "team": t, "tier": tier, "layer": layer, "lang": lang, "revenue": REVENUE_PER_MIN.get(n, 0),
                  "version": f"v{rng.randint(1, 5)}.{rng.randint(0, 9)}.{rng.randint(0, 9)}"}
                 for n, t, tier, layer, lang, _deps in SERVICES
             ]

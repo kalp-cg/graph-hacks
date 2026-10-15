@@ -17,7 +17,7 @@ from ..agent.loop import investigate
 from ..agent.mcp_client import GraphToolbox
 from ..config import settings
 from ..db import get_graph, rows
-from ..seed.scenarios import SCENARIOS, inject_scenario, reset
+from ..seed.scenarios import SCENARIOS, inject_chaos, inject_scenario, reset
 from ..tools import actions
 from .graph_view import graph_snapshot, incidents_view
 
@@ -150,6 +150,21 @@ async def start_scenario(name: str) -> dict:
     hub.history = []
     await hub.broadcast({"type": "scenario_started", **info})
     await hub.broadcast({"type": "graph_update", "reason": "scenario"})
+    return info
+
+
+@app.post("/api/chaos/{service}")
+async def chaos(service: str, mode: str = "down", deploy: bool = False) -> dict:
+    """Break any service (optionally with a bad deploy). Unscripted: the agent must work it out."""
+    if runs.busy:
+        raise HTTPException(409, "wait for the current investigation to finish")
+    try:
+        info = await asyncio.to_thread(inject_chaos, service, mode, deploy)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    hub.history = []
+    await hub.broadcast({"type": "scenario_started", **info})
+    await hub.broadcast({"type": "graph_update", "reason": "chaos"})
     return info
 
 

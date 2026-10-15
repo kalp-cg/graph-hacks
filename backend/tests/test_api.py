@@ -44,3 +44,9 @@ def test_api_flow(graph, monkeypatch):
         page = next(a for a in final["actions"] if a["kind"] == "page_oncall")
         assert c.post(f"/api/actions/{page['uid']}/reject").json()["status"] == "rejected"
         assert c.get("/api/incidents").json()[0]["status"] == "resolved"
+
+        assert c.post("/api/chaos/nope").status_code == 404
+        info = c.post("/api/chaos/pricing-service?mode=degraded&deploy=true").json()
+        assert info["target"] == "pricing-service" and info["deploy"]["version"].startswith("v9.")
+        svc = next(n for n in c.get("/api/graph").json()["nodes"] if n["id"] == "svc:pricing-service")
+        assert svc["status"] == "degraded" and svc["revenue_per_min"] == 350

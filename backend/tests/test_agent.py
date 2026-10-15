@@ -2,6 +2,8 @@
 import asyncio
 import os
 
+import pytest
+
 from conftest import TEST_GRAPH
 from sentinel.agent.autopilot import Autopilot
 from sentinel.agent.llm import LLMReply
@@ -94,3 +96,26 @@ def test_compact_for_llm_trims():
     big = {"result": {"items": [{"x": "y" * 50} for _ in range(200)]}, "cypher": "MATCH", "node_uids": ["a"] * 100}
     text = compact_for_llm(big)
     assert len(text) < 4000 and "cypher" not in text and "more" in text
+
+
+CHAOS = [("pricing-service", "degraded", True), ("secrets-vault", "down", False), ("session-store", "down", True),
+         ("cdn-edge", "down", True), ("service-mesh", "degraded", False), ("kafka-bus", "down", False)]
+
+
+@pytest.mark.parametrize("service,mode,with_deploy", CHAOS)
+def test_chaos_anywhere_is_found_and_fixed(graph, monkeypatch, service, mode, with_deploy):
+    """Unscripted failures in every layer: the agent must find the broken service and the fix must heal all."""
+    from sentinel.db import rows
+    from sentinel.seed.scenarios import inject_chaos
+
+    monkeypatch.setattr("sentinel.tools.common.get_graph", lambda name=None: graph)
+    inject_scenario("db-pool-exhaustion", graph, fresh=True)
+    inject_chaos(service, mode, with_deploy, graph)
+    final, _ = run()
+    assert final["root_cause"] == service
+    kinds = {a["kind"] for a in final["actions"]}
+    assert ("rollback" in kinds) == with_deploy
+    for a in final["actions"]:
+        execute_action(a["uid"], graph=graph)
+    assert rows(graph, "MATCH (s:Service) WHERE s.status <> 'healthy' RETURN count(s) AS n")[0]["n"] == 0
+    assert rows(graph, "MATCH (a:Alert {status: 'firing'}) RETURN count(a) AS n")[0]["n"] == 0

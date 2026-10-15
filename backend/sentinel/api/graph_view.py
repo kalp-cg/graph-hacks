@@ -29,7 +29,8 @@ NODE_QUERIES = [
 
 KEEP = ("name", "status", "tier", "layer", "language", "version", "at", "change_summary", "message", "sha",
         "metric", "value", "threshold", "id", "title", "severity", "summary", "steps_taken", "kind", "target",
-        "reason", "risk", "outcome", "role", "handle", "engine", "size_gb", "learned", "root_cause_service")
+        "reason", "risk", "outcome", "role", "handle", "engine", "size_gb", "learned", "root_cause_service",
+        "revenue_per_min", "root_fault")
 
 
 def _label(n: dict, t: str) -> str:

@@ -16,7 +16,10 @@ def recompute_health(graph: Graph) -> dict:
     Root causes (unhealthy services without their own alert) only recover through an action.
     Returns the recovered service uids and the resolved alert uids.
     """
-    status = {r["name"]: r["status"] for r in rows(graph, "MATCH (s:Service) RETURN s.name AS name, s.status AS status")}
+    found = rows(graph, "MATCH (s:Service) RETURN s.name AS name, s.status AS status, "
+                        "coalesce(s.root_fault, false) AS fault")
+    status = {r["name"]: r["status"] for r in found}
+    faulty = {r["name"] for r in found if r["fault"]}
     deps: dict[str, list[str]] = defaultdict(list)
     for r in rows(graph, "MATCH (a:Service)-[r:DEPENDS_ON]->(b:Service) WHERE r.breaker <> 'open' "
                          "RETURN a.name AS a, b.name AS b"):
@@ -43,13 +46,18 @@ def recompute_health(graph: Graph) -> dict:
     while changed:
         changed = False
         for name in sorted(alerts):
-            if status.get(name) != "healthy" and not unhealthy_below(name):
+            # A service with its own fault (the root cause) only recovers through an action.
+            if status.get(name) != "healthy" and name not in faulty and not unhealthy_below(name):
                 status[name] = "healthy"
                 recovered.append(name)
                 changed = True
 
-    resolved = [uid for name in recovered for uid in alerts[name]]
+    # Alerts resolve on every healthy service with nothing unhealthy below it, including a root that an
+    # action fixed directly (e.g. an edge service alerting on itself).
+    resolved = [uid for name in sorted(alerts) if status.get(name) == "healthy" and not unhealthy_below(name)
+                for uid in alerts[name]]
     if recovered:
         graph.query("UNWIND $names AS n MATCH (s:Service {name: n}) SET s.status = 'healthy'", {"names": recovered})
+    if resolved:
         graph.query("UNWIND $uids AS u MATCH (a:Alert {uid: u}) SET a.status = 'resolved'", {"uids": resolved})
     return {"recovered": [f"svc:{n}" for n in recovered], "resolved_alerts": resolved}

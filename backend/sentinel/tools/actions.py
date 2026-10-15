@@ -168,7 +168,7 @@ def execute_action(uid: str, approved_by: str = "human", graph: Graph | None = N
     kind, target = a["kind"], a["target"]
     if kind == "rollback":
         g.query("MATCH (d:Deployment {uid: $dep}) SET d.status = 'rolled_back'", {"dep": a["target_uid"]})
-        g.query("MATCH (s:Service {name: $name}) SET s.status = 'healthy'", {"name": target})
+        g.query("MATCH (s:Service {name: $name}) SET s.status = 'healthy', s.root_fault = false", {"name": target})
         changed += [a["target_uid"], f"svc:{target}"]
         outcome = f"rolled back {a['target_uid'].split(':')[-1]} on {target}"
     elif kind == "open_breaker":
@@ -177,7 +177,7 @@ def execute_action(uid: str, approved_by: str = "human", graph: Graph | None = N
         edges += [r["uid"] for r in opened]
         outcome = f"opened {len(opened)} circuit breakers into {target}"
     elif kind == "scale_up":
-        g.query("MATCH (s:Service {name: $name}) SET s.status = 'healthy'", {"name": target})
+        g.query("MATCH (s:Service {name: $name}) SET s.status = 'healthy', s.root_fault = false", {"name": target})
         closed = rows(g, "MATCH (:Service)-[r:DEPENDS_ON {breaker: 'open'}]->(:Service {name: $name}) "
                          "SET r.breaker = 'closed' RETURN r.uid AS uid", {"name": target})
         edges += [r["uid"] for r in closed]

@@ -84,3 +84,16 @@ def test_learned_incident_is_recalled_after_soft_reset(graph):
     assert top["id"] == inc["id"]
     assert top["root_cause_service"] == "kafka-bus"
     assert top["fixes"] == ["rollback"] and top["steps_taken"] == 9
+
+
+def test_paging_does_not_heal_a_root_that_alerts_on_itself(graph):
+    from sentinel.seed.scenarios import inject_chaos
+
+    inject_scenario("db-pool-exhaustion", graph, fresh=True)
+    inject_chaos("cdn-edge", "down", True, graph)  # nothing calls cdn-edge, so it alerts on itself
+    page = propose_action("page_oncall", "cdn-edge", "x", graph=graph)["result"]["action"]["uid"]
+    assert execute_action(page, graph=graph)["recovered"] == []
+    assert unhealthy(graph) == {"cdn-edge"} and firing(graph) == 1
+    fix = propose_action("rollback", "cdn-edge", "x", graph=graph)["result"]["action"]["uid"]
+    execute_action(fix, graph=graph)
+    assert unhealthy(graph) == set() and firing(graph) == 0

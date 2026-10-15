@@ -133,3 +133,23 @@ DATA_ACCESS = [
 # Every service also talks to the observability pipeline; those edges are added by the generator
 # for business services only, to keep the picture readable.
 OBSERVABILITY = ["metrics-collector", "logging-pipeline"]
+
+# Revenue that depends on each user-facing service, in $/minute (drives the cost-of-downtime ticker).
+REVENUE_PER_MIN = {
+    "checkout-api": 1800, "payments-api": 1500, "cart-service": 700, "orders-service": 900,
+    "web-bff": 1200, "mobile-bff": 800, "api-gateway": 2400, "cdn-edge": 2600,
+    "search-service": 450, "catalog-service": 500, "recommendations": 300, "pricing-service": 350,
+    "inventory-service": 600, "auth-service": 1100, "user-profile": 250, "session-store": 400,
+    "promotions": 150, "loyalty-service": 80, "notifications": 120, "shipping-service": 200,
+    "fraud-detector": 650, "tax-service": 300, "reviews-service": 40,
+}
+
+# Plausible commit messages for chaos-mode deploys.
+CHAOS_CHANGES = [
+    "Lower connection timeout from 5s to 500ms",
+    "Switch serializer to the new protobuf schema",
+    "Enable aggressive retry with no backoff",
+    "Halve worker pool to save memory",
+    "Upgrade client library to 4.0 (breaking defaults)",
+    "Turn on request-level debug logging",
+]
