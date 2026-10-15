@@ -12,6 +12,7 @@ EXPECTED = {
     "db-pool-exhaustion": ("inventory-db-proxy", "v4.2.0"),
     "bad-config-push": ("feature-flags", "v4.0.3"),
     "cache-stampede": ("redis-cache", None),
+    "kafka-rebalance-storm": ("kafka-bus", "v4.1.0"),
 }
 PAST_INCIDENT = {"db-pool-exhaustion": "INC-0042", "bad-config-push": "INC-0057", "cache-stampede": "INC-0063"}
 
@@ -19,7 +20,7 @@ PAST_INCIDENT = {"db-pool-exhaustion": "INC-0042", "bad-config-push": "INC-0057"
 @pytest.fixture
 def pool(graph):
     """Fresh db-pool-exhaustion state for each test (other tests inject other scenarios)."""
-    info = inject_scenario("db-pool-exhaustion", graph)
+    info = inject_scenario("db-pool-exhaustion", graph, fresh=True)
     return graph, info
 
 

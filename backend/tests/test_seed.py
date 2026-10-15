@@ -48,3 +48,17 @@ def test_scenario_fires_alerts(graph, name):
 def test_unknown_scenario(graph):
     with pytest.raises(ValueError):
         inject_scenario("does-not-exist", graph)
+
+
+def test_soft_reset_keeps_graph_stable(graph):
+    inject_scenario("db-pool-exhaustion", graph, fresh=True)
+    before = rows(graph, "MATCH (n) RETURN count(n) AS n")[0]["n"]
+    for name in ("cache-stampede", "kafka-rebalance-storm", "db-pool-exhaustion"):
+        inject_scenario(name, graph)
+    after = rows(graph, "MATCH (n) RETURN count(n) AS n")[0]["n"]
+    assert before == after
+    # Only the current scenario's alerts fire and only its root is unhealthy.
+    firing = rows(graph, "MATCH (a:Alert {status: 'firing'}) RETURN count(a) AS n")[0]["n"]
+    assert firing == 3
+    unhealthy = rows(graph, "MATCH (s:Service) WHERE s.status <> 'healthy' RETURN count(s) AS n")[0]["n"]
+    assert unhealthy == 4
