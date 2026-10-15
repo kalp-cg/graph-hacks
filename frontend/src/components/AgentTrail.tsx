@@ -32,7 +32,7 @@ export default function AgentTrail({ run, incidents, activeStep, onStep, onFocus
         ))}
         {tab === "trail" && run.runId && (
           <span className="ml-auto pb-2 font-mono text-[11px] text-faint">
-            {run.incidentId ?? ""} · {run.steps.length} steps
+            {run.incidentId ?? ""} · {run.final?.steps ?? run.steps.filter((s) => s.name !== "conclude_investigation").length} steps
           </span>
         )}
       </div>

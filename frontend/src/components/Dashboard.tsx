@@ -294,7 +294,10 @@ export default function Dashboard() {
   };
 
   const offline = apiState !== "up";
-  const pending = actions.filter((a) => a.status === "pending");
+  // Fixes first, then the page; oldest first within each.
+  const order = (k: string) => (k === "page_oncall" ? 1 : 0);
+  const pending = actions.filter((a) => a.status === "pending")
+    .sort((a, b) => order(a.kind) - order(b.kind) || (a.created_at ?? 0) - (b.created_at ?? 0));
   const done = run.runId
     ? actions.filter((a) => ["executed", "rejected", "failed"].includes(a.status) && a.run_id === run.runId)
     : [];
