@@ -1,3 +1,5 @@
+# Full stack: docker compose up --build   ->   UI http://localhost:3001 · API http://localhost:8100
+# FalkorDB only (for local development): docker compose up -d falkordb
 services:
   falkordb:
     image: falkordb/falkordb:latest
@@ -6,7 +8,45 @@ services:
       - "3000:3000"                       # FalkorDB Browser UI
     volumes:
       - falkordb_data:/var/lib/falkordb/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
     restart: unless-stopped
+
+  backend:
+    build: ./backend
+    depends_on:
+      falkordb:
+        condition: service_healthy
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      GRAPH_NAME: ${GRAPH_NAME:-sentinel}
+      # ollama (on the host) | gemini | openai | autopilot (no LLM needed)
+      LLM_PROVIDER: ${LLM_PROVIDER:-autopilot}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PAGER_WEBHOOK_URL: ${PAGER_WEBHOOK_URL:-}
+      CORS_ORIGINS: http://localhost:3001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8100:8100"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8100}
+    depends_on:
+      - backend
+    ports:
+      - "3001:3001"
 
 volumes:
   falkordb_data:
