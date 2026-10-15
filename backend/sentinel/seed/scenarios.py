@@ -62,12 +62,14 @@ def soft_reset(graph: Graph) -> None:
     # Unfinished investigations don't become memory (recall only reads resolved incidents).
     graph.query("MATCH (i:Incident) WHERE i.status <> 'resolved' SET i.status = 'abandoned'")
     graph.query("MATCH (a:Action) WHERE a.status IN ['pending', 'approved'] SET a.status = 'expired'")
-    # Drop scenario leftovers that no incident points to.
-    graph.query("MATCH (a:Alert) WHERE size([(a)<-[:TRIGGERED_BY]-(:Incident) | 1]) = 0 DETACH DELETE a")
-    graph.query("MATCH (a:Action) WHERE size([(a)<-[:RESOLVED_BY]-(:Incident) | 1]) = 0 DETACH DELETE a")
-    graph.query("MATCH (p:Page) WHERE size([(p)<-[:PAGED]-(:Incident) | 1]) = 0 DETACH DELETE p")
+    # Drop scenario leftovers that no incident points to. (OPTIONAL MATCH + count rather than pattern
+    # comprehensions in WHERE, which FalkorDB 4.x rejects.)
+    for label, rel in (("Alert", "TRIGGERED_BY"), ("Action", "RESOLVED_BY"), ("Page", "PAGED")):
+        graph.query(f"MATCH (n:{label}) OPTIONAL MATCH (n)<-[r:{rel}]-(:Incident) "
+                    "WITH n, count(r) AS refs WHERE refs = 0 DETACH DELETE n")
     graph.query(
-        "MATCH (d:Deployment {origin: 'scenario'}) WHERE size([(d)<-[:ROOT_CAUSE]-(:Incident) | 1]) = 0 "
+        "MATCH (d:Deployment {origin: 'scenario'}) OPTIONAL MATCH (d)<-[r:ROOT_CAUSE]-(:Incident) "
+        "WITH d, count(r) AS refs WHERE refs = 0 "
         "OPTIONAL MATCH (d)-[:CONTAINS]->(c:Commit) DETACH DELETE d, c"
     )
     graph.query("MATCH (d:Deployment {origin: 'scenario'}) SET d.status = 'rolled_back'")
