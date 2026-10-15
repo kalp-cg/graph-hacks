@@ -26,6 +26,15 @@
    recall finds it by traversal and the agent goes straight to the fix (**8 → 6 steps, 67 s → 47 s** measured with
    a local 8B model).
 
+### Not scripted: chaos mode
+
+**Right-click any service** (or open its card) to break it: *bad deploy → down*, *crash*, or *degrade*. Its most
+important callers start alerting and the agent has to work it out from the graph. Tests cover chaos in every
+layer (edge, business, platform). The top bar keeps a **cost-of-downtime ticker**: `revenue_per_min` summed
+over unhealthy services (degraded counts half), which freezes into the final bill when everything is green.
+
+![chaos: secrets-vault broken by a random bad deploy, found, 28-service blast radius lit up](docs/images/08-chaos.png)
+
 ## Why a graph?
 
 "Checkout, cart and orders are all slow" isn't a text-search problem, it's a *path* problem:
@@ -219,7 +228,7 @@ From the terminal, no UI:
 ```bash
 cd backend
 python -m sentinel.agent.cli --scenario db-pool-exhaustion --provider ollama --approve
-pytest -q                                         # 48 tests against a real FalkorDB (graph 'sentinel_test')
+pytest -q                                         # 55 tests against a real FalkorDB (graph 'sentinel_test')
 ```
 
 ### Use the tools from Claude Desktop / Cursor
@@ -254,6 +263,7 @@ pytest -q                                         # 48 tests against a real Falk
 | :--- | :--- | :--- |
 | GET | `/api/health` · `/api/graph` · `/api/incidents` · `/api/scenarios` · `/api/actions` | read models |
 | POST | `/api/scenarios/{name}` | soft reset (keeps learned memory) + inject |
+| POST | `/api/chaos/{service}?mode=down\|degraded&deploy=true` | break any service (unscripted) |
 | POST | `/api/reset?keep_memory=true\|false` | |
 | POST | `/api/runs` `{provider?, question?}` | start an investigation (one at a time) |
 | POST | `/api/actions/{uid}/approve` · `/reject` | the human in the loop |
@@ -268,7 +278,7 @@ backend/sentinel/
   mcp_server.py   12 tools over stdio
   agent/       llm (providers), mcp_client, loop, prompts, autopilot, cli
   api/         FastAPI app + graph read models
-backend/tests/ 48 tests: seed, tools, actions, agent loop over real MCP, API + WebSocket
+backend/tests/ 55 tests: seed, tools, actions, chaos, agent loop over real MCP, API + WebSocket
 frontend/src/  Dashboard, GraphCanvas, AgentTrail, ControlPanel, TopBar, useRunSocket
 docs/          data model, screenshots, demo
 ```

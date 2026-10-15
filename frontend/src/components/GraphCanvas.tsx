@@ -17,6 +17,7 @@ interface Props {
   showContext: boolean;
   selected: string | null;
   onSelect: (node: GNode | null) => void;
+  onMenu: (node: GNode, x: number, y: number) => void;
 }
 
 const LAYER_Y: Record<string, number> = { edge: -340, business: -100, data: 170, platform: 340 };
@@ -85,7 +86,7 @@ function shape(ctx: CanvasRenderingContext2D, n: N, r: number) {
   }
 }
 
-export default function GraphCanvas({ data, highlight, flashes, focus, showContext, selected, onSelect }: Props) {
+export default function GraphCanvas({ data, highlight, flashes, focus, showContext, selected, onSelect, onMenu }: Props) {
   const fg = useRef<ForceGraphMethods<N, L> | undefined>(undefined);
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -184,6 +185,10 @@ export default function GraphCanvas({ data, highlight, flashes, focus, showConte
         linkVisibility={linkVisible}
         nodeLabel={(n) => tooltip(n)}
         onNodeClick={(n) => onSelect(n)}
+        onNodeRightClick={(n, ev) => {
+          const r = box.current?.getBoundingClientRect();
+          onMenu(n, ev.clientX - (r?.left ?? 0), ev.clientY - (r?.top ?? 0));
+        }}
         onBackgroundClick={() => onSelect(null)}
         linkColor={(l) => {
           if (highlight.currentEdges.has(l.id as string)) return "rgba(34,211,238,0.95)";

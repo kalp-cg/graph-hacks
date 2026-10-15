@@ -15,9 +15,12 @@ interface Props {
   incident: { openSince: number | null; resolvedIn: number | null; now: number };
   firing: number;
   unhealthy: number;
+  cost: { perMin: number; total: number };
 }
 
-export default function TopBar({ health, connected, model, incident, firing, unhealthy }: Props) {
+const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
+
+export default function TopBar({ health, connected, model, incident, firing, unhealthy, cost }: Props) {
   const open = incident.openSince !== null;
   return (
     <header className="glass relative z-20 flex h-14 shrink-0 items-center gap-4 rounded-xl px-4">
@@ -44,6 +47,9 @@ export default function TopBar({ health, connected, model, incident, firing, unh
             <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
             <span className="text-xs font-semibold uppercase tracking-wider text-red-300">Incident</span>
             <span className="text-xs text-red-200/80">{firing} alerts · {unhealthy} unhealthy</span>
+            <span className="ml-1 border-l border-red-500/30 pl-2 font-mono text-sm tabular-nums text-red-100" title="Revenue at risk, summed over unhealthy services">
+              {usd(cost.total)} <span className="text-[10px] text-red-300/80">lost · {usd(cost.perMin)}/min</span>
+            </span>
             <Timer className="ml-1 h-3.5 w-3.5 text-red-300" />
             <span className="font-mono text-sm tabular-nums text-red-100">{fmt(incident.now - (incident.openSince ?? 0))}</span>
           </div>
@@ -51,7 +57,7 @@ export default function TopBar({ health, connected, model, incident, firing, unh
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Recovered</span>
-            <span className="text-xs text-emerald-200/80">MTTR</span>
+            <span className="text-xs text-emerald-200/80">cost {usd(cost.total)} · MTTR</span>
             <span className="font-mono text-sm tabular-nums text-emerald-100">{fmt(incident.resolvedIn)}</span>
           </div>
         ) : (

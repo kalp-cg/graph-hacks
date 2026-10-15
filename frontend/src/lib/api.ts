@@ -28,6 +28,8 @@ export const api = {
   incidents: () => call<Incident[]>("/api/incidents"),
   actions: (status?: string) => call<Action[]>("/api/actions" + (status ? `?status=${status}` : "")),
   inject: (name: string) => call<{ alerting_services: string[] }>(`/api/scenarios/${name}`, { method: "POST" }),
+  chaos: (service: string, mode: "down" | "degraded", deploy: boolean) =>
+    call<{ alerting_services: string[] }>(`/api/chaos/${service}?mode=${mode}&deploy=${deploy}`, { method: "POST" }),
   reset: (keepMemory = true) => call(`/api/reset?keep_memory=${keepMemory}`, { method: "POST" }),
   run: (provider?: string, question?: string) =>
     call<{ run_id: string }>("/api/runs", {

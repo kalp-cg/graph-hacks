@@ -29,6 +29,8 @@ export interface GNode {
   role?: string;
   engine?: string;
   learned?: boolean;
+  revenue_per_min?: number;
+  root_fault?: boolean;
   pagerank?: number;
   betweenness?: number;
   x?: number;
