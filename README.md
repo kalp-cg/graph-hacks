@@ -5,12 +5,15 @@
 
 **Graph Hacks: Context for AI Agents** (WeMakeDevs × FalkorDB) · **Track 01: Agents That Act on Connected Data**
 
+[![tests](https://github.com/kalp-cg/graph-hacks/actions/workflows/tests.yml/badge.svg)](https://github.com/kalp-cg/graph-hacks/actions/workflows/tests.yml)
+[![e2e](https://github.com/kalp-cg/graph-hacks/actions/workflows/e2e.yml/badge.svg)](https://github.com/kalp-cg/graph-hacks/actions/workflows/e2e.yml)
+
 ### 🌐 [Live demo: graph-hacks-alpha.vercel.app](https://graph-hacks-alpha.vercel.app/) · [API health](https://sentinelgraph-api-relh.onrender.com/api/health)
 
 UI on Vercel · API + agent on Render · graph on **FalkorDB Cloud** (ap-south-1).
 *The API runs on Render's free plan and sleeps when idle. If the first load says "reconnecting", give it about a
 minute to wake up.* Try it: **Break production → `db-pool-exhaustion`**, then **Investigate**, then **Approve**.
-Or right-click any service to break it yourself.
+Or press <kbd>/</kbd>, find any service and break it yourself.
 
 ![SentinelGraph demo: inject an incident, the agent walks the graph, a human approves, the graph turns green](docs/images/demo.gif)
 
@@ -35,12 +38,13 @@ Or right-click any service to break it yourself.
 
 ### Not scripted: chaos mode
 
-**Right-click any service** (or open its card) to break it: *bad deploy → down*, *crash*, or *degrade*. Its most
+Press <kbd>/</kbd> (or right-click a node) to pick **any service** and break it: *ship a bad deploy*, *crash it*, or
+*degrade it*. Its most
 important callers start alerting and the agent has to work it out from the graph. Tests cover chaos in every
 layer (edge, business, platform). The top bar keeps a **cost-of-downtime ticker**: `revenue_per_min` summed
 over unhealthy services (degraded counts half), which freezes into the final bill when everything is green.
 
-![chaos: secrets-vault broken by a random bad deploy, found, 28-service blast radius lit up](docs/images/08-chaos.png)
+![chaos: secrets-vault broken by a random bad deploy; the agent finds v9.6.1 and a 28-service blast radius](docs/images/08-chaos.png)
 
 ## Why a graph?
 
@@ -339,6 +343,27 @@ CI runs the backend suite against a FalkorDB service container on every push.
 - A local 8B model takes ~45–90 s per investigation and needs the guards above. Bigger hosted models are faster
   and need fewer nudges.
 - Recovery is modelled by graph traversal over service status, not by real health checks.
+
+## Testing
+
+Three layers, all against a real FalkorDB, nothing mocked:
+
+| Layer | What | Where |
+| :--- | :--- | :--- |
+| Backend | 57 pytest tests: seed determinism, every tool, actions incl. concurrent approvals, chaos in every layer, the agent loop over a real MCP stdio session, API + WebSocket | `backend/tests`, CI `tests` |
+| End-to-end | 11 Playwright tests driving the browser through the full stack: incident lifecycle, reject, red herring, memory repeat, chaos via search, reset ≠ recovery, one run at a time, **two viewers in sync over the WebSocket**, late-joiner replay, **a sleeping API that recovers by itself**, double-click approve runs once | `e2e/tests`, CI `e2e` |
+| Production | the same e2e suite pointed at the live Vercel + Render + FalkorDB Cloud deployment: 11/11 passing | `E2E_BASE_URL=… E2E_API_URL=… npx playwright test` |
+
+Run the e2e suite locally (stack running on :3001 / :8100):
+
+```bash
+cd e2e && npm install && npx playwright install chromium && npx playwright test
+```
+
+Bugs these tests caught (each fixed with a regression test): two simultaneous approvals executed an action four
+times; the cost ticker never grew; the page stayed empty forever if the API was asleep at load; a reset was shown
+as a recovery; recovery "healed" a root cause after a page; a search typed before the graph loaded did nothing on
+remote hosting; FalkorDB 4.x rejected a query style the dev build accepted.
 
 ## License
 

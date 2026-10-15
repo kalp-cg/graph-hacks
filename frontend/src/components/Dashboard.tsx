@@ -484,7 +484,7 @@ function Offline({ state }: { state: ApiState }) {
 }
 
 function NodeCard({ node, onClose, onBreak, disabled }: { node: GNode; onClose: () => void; onBreak: Break; disabled: boolean }) {
-  const skip = new Set(["x", "y", "vx", "vy", "fx", "fy", "index", "__indexColor", "label", "id", "type", "name"]);
+  const skip = new Set(["x", "y", "vx", "vy", "fx", "fy", "index", "__indexColor", "label", "id", "type", "name", "root_fault"]);
   const entries = Object.entries(node).filter(([k, v]) => !skip.has(k) && v !== null && v !== undefined && v !== "" && v !== false && !(k === "revenue_per_min" && v === 0));
   const fmt = (k: string, v: unknown) => k === "at" ? new Date(Number(v)).toLocaleString()
     : k === "revenue_per_min" ? `$${v}/min` : typeof v === "number" ? String(+v.toFixed(4)) : String(v);
