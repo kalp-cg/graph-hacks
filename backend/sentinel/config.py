@@ -17,6 +17,9 @@ class Settings:
     falkordb_port: int = int(os.getenv("FALKORDB_PORT", "6380"))
     falkordb_username: str | None = os.getenv("FALKORDB_USERNAME") or None
     falkordb_password: str | None = os.getenv("FALKORDB_PASSWORD") or None
+    falkordb_ssl: bool = os.getenv("FALKORDB_SSL", "false").lower() == "true"
+    # Some networks (DNS64/NAT64 hotspots) hand out an IPv6 address first that never connects.
+    falkordb_ipv4: bool = os.getenv("FALKORDB_IPV4", "false").lower() == "true"
     graph_name: str = os.getenv("GRAPH_NAME", "sentinel")
 
     llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")

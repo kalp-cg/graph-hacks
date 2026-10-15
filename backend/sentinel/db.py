@@ -1,4 +1,5 @@
 """FalkorDB connection helpers."""
+import socket
 from functools import lru_cache
 from typing import Any
 
@@ -9,11 +10,16 @@ from .config import settings
 
 @lru_cache(maxsize=1)
 def get_db() -> FalkorDB:
+    host = settings.falkordb_host
+    if settings.falkordb_ipv4 and not settings.falkordb_ssl:
+        host = socket.getaddrinfo(host, settings.falkordb_port, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
     return FalkorDB(
-        host=settings.falkordb_host,
+        host=host,
         port=settings.falkordb_port,
         username=settings.falkordb_username,
         password=settings.falkordb_password,
+        ssl=settings.falkordb_ssl,
+        socket_connect_timeout=10,
     )
 
 
