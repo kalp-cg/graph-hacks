@@ -57,19 +57,28 @@ class Autopilot:
 
         if "find_common_cause" not in done:
             return call("find_common_cause", services=services)
-        candidates = last["find_common_cause"].get("candidates") or []
+        common_res = last.get("find_common_cause") or {}
+        if not isinstance(common_res, dict):
+            common_res = {}
+        candidates = common_res.get("candidates") or []
         if not candidates:
             return LLMReply(content="No shared dependency found for the alerting services; escalating to a human.")
         top = candidates[0]["name"]
 
         if "recall_similar" not in done:
             return call("recall_similar", services=services)
-        repeat = next((i for i in last["recall_similar"].get("incidents") or []
+        recall_res = last.get("recall_similar") or {}
+        if not isinstance(recall_res, dict):
+            recall_res = {}
+        repeat = next((i for i in (recall_res.get("incidents") or [])
                        if i.get("root_cause_service") == top), None)
 
         if "recent_changes" not in done:
             return call("recent_changes", services=[top], minutes=60)
-        changes = last["recent_changes"].get("changes") or []
+        recent_res = last.get("recent_changes") or {}
+        if not isinstance(recent_res, dict):
+            recent_res = {}
+        changes = recent_res.get("changes") or []
         change = changes[0] if changes else None
 
         if not repeat:
