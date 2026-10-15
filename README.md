@@ -144,6 +144,33 @@ flows *against* the arrow. Blast radius = `(up)-[:DEPENDS_ON*1..6]->(broken)`.
 Seed (deterministic, seed 42): 38 services in 4 layers, 8 teams, 18 people with on-call windows, 8 databases,
 ~100 deployments with commits and authors, 3 past incidents with fixes and runbooks.
 
+### Explore it in the FalkorDB Browser
+
+The Browser's default `MATCH (n) … LIMIT 100` only shows a slice of people and commits. These show the
+interesting structure (graph `sentinel`):
+
+```cypher
+// The whole service dependency map
+MATCH p=(:Service)-[:DEPENDS_ON]->(:Service) RETURN p
+
+// What the agent sees for db-pool-exhaustion: three alerting services converge on one dependency
+MATCH p=(a:Service)-[:DEPENDS_ON*1..3]->(:Service {name:'inventory-db-proxy'})
+WHERE a.name IN ['checkout-api','cart-service','orders-service'] RETURN p
+
+// Blast radius: everything that breaks if kafka-bus goes down
+MATCH p=(:Service)-[:DEPENDS_ON*1..6]->(:Service {name:'kafka-bus'}) RETURN p
+
+// Memory: past incidents linked to what they touched, what caused them and what fixed them
+MATCH p=(:Incident)-[:AFFECTED|ROOT_CAUSE|RESOLVED_BY|FOLLOWED|SIMILAR_TO]->() RETURN p
+
+// Who gets paged for inventory-db-proxy
+MATCH p=(:Person)-[:ON_CALL]->(:Team)-[:OWNS]->(:Service {name:'inventory-db-proxy'}) RETURN p
+
+// The most depended-on services
+CALL algo.pageRank('Service','DEPENDS_ON') YIELD node, score
+RETURN node.name AS service, score ORDER BY score DESC LIMIT 10
+```
+
 ## FalkorDB features used
 
 | Feature | Where |
