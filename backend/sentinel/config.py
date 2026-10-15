@@ -22,6 +22,7 @@ class Settings:
     llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")
     llm_model: str = os.getenv("LLM_MODEL", "")
     llm_max_steps: int = int(os.getenv("LLM_MAX_STEPS", "14"))
+    autopilot_delay_s: float = float(os.getenv("AUTOPILOT_DELAY_S", "0.9"))
     ollama_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:8b")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")

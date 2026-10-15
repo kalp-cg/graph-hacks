@@ -4,6 +4,7 @@ It runs the same investigation protocol through the same MCP tools, so its runs 
 run in the UI. Uses: CI, demos without a model, and taking over mid-run when the model fails (rate limit,
 outage). It is always labelled as autopilot, never presented as the model.
 """
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -33,7 +34,13 @@ def _history(messages: list[dict]) -> list[tuple[str, dict, dict]]:
 class Autopilot:
     name = "autopilot (deterministic, no LLM)"
 
+    def __init__(self, delay_s: float = 0.0):
+        # Optional pause per step so people watching the UI can follow along; 0 in tests and CLI.
+        self.delay_s = delay_s
+
     async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
+        if self.delay_s:
+            await asyncio.sleep(self.delay_s)
         h = _history(messages)
         last = {name: res.get("result", res) for name, _args, res in h}
         done = set(last)

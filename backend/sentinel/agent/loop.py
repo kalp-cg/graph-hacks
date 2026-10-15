@@ -144,7 +144,7 @@ async def investigate(question: str, emit: Emit, toolbox: GraphToolbox, llm: LLM
                 raise
             log.warning("LLM failed, autopilot takes over: %s", exc)
             await send({"type": "provider_fallback", "from": llm.name, "to": Autopilot.name, "reason": str(exc)[:300]})
-            llm = Autopilot()
+            llm = Autopilot(settings.autopilot_delay_s)
             continue
 
         if reply.content and reply.tool_calls:

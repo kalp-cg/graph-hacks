@@ -1,7 +1,11 @@
-import pytest
+import os
 
-from sentinel.db import get_graph
-from sentinel.seed.generator import wipe
+os.environ.setdefault("AUTOPILOT_DELAY_S", "0")  # before sentinel.config is imported
+
+import pytest  # noqa: E402
+
+from sentinel.db import get_graph  # noqa: E402
+from sentinel.seed.generator import wipe  # noqa: E402
 
 TEST_GRAPH = "sentinel_test"
 

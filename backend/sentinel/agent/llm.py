@@ -147,5 +147,5 @@ def make_llm(provider: str | None = None) -> LLM:
     if provider == "autopilot":
         from .autopilot import Autopilot
 
-        return Autopilot()
+        return Autopilot(settings.autopilot_delay_s)
     raise RuntimeError(f"unknown LLM_PROVIDER {provider!r}")
