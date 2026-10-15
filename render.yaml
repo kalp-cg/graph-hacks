@@ -1,0 +1,31 @@
+# Render Blueprint: New > Blueprint > pick this repo. Secrets (sync: false) are asked for at creation.
+services:
+  - type: web
+    name: sentinelgraph-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore          # closest Render region to the FalkorDB Cloud instance (ap-south-1)
+    healthCheckPath: /api/health
+    envVars:
+      - key: FALKORDB_HOST
+        sync: false
+      - key: FALKORDB_PORT
+        sync: false
+      - key: FALKORDB_USERNAME
+        sync: false
+      - key: FALKORDB_PASSWORD
+        sync: false
+      - key: FALKORDB_SSL
+        value: "false"
+      - key: GRAPH_NAME
+        value: sentinel
+      - key: LLM_PROVIDER
+        value: gemini           # a real model; autopilot takes over if it fails
+      - key: LLM_MODEL
+        value: gemini-3.1-flash-lite
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AUTOPILOT_DELAY_S
+        value: "0.9"

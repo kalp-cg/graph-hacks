@@ -149,3 +149,19 @@ def make_llm(provider: str | None = None) -> LLM:
 
         return Autopilot(settings.autopilot_delay_s)
     raise RuntimeError(f"unknown LLM_PROVIDER {provider!r}")
+
+
+def available_providers() -> list[str]:
+    """Providers that can actually run here (shown in the UI's model picker)."""
+    out = []
+    try:
+        httpx.get(f"{settings.ollama_url.rstrip('/')}/api/tags", timeout=1.0).raise_for_status()
+        out.append("ollama")
+    except Exception:  # noqa: BLE001 - not running / not reachable
+        pass
+    if settings.gemini_api_key:
+        out.append("gemini")
+    if settings.openai_base_url and settings.openai_api_key and settings.llm_model:
+        out.append("openai")
+    out.append("autopilot")
+    return out

@@ -15,8 +15,9 @@ const GraphCanvas = dynamic(() => import("./GraphCanvas"), { ssr: false });
 
 const PROVIDERS = [
   { id: "", label: "Default model (server LLM_PROVIDER)" },
-  { id: "ollama", label: "Local: Ollama qwen3:8b" },
-  { id: "gemini", label: "Gemini (API key)" },
+  { id: "ollama", label: "Local: Ollama" },
+  { id: "gemini", label: "Gemini" },
+  { id: "openai", label: "OpenAI-compatible API" },
   { id: "autopilot", label: "Autopilot (deterministic, no LLM)" },
 ];
 
@@ -199,7 +200,8 @@ export default function Dashboard() {
       <div className="flex min-h-0 flex-1 gap-2">
         <ControlPanel
           scenarios={scenarios} alerts={alerts} pending={pending} done={done} running={run.running} busy={busy}
-          provider={provider} providers={PROVIDERS} onProvider={setProvider}
+          provider={provider} onProvider={setProvider}
+          providers={PROVIDERS.filter((p) => !p.id || !health?.providers || health.providers.includes(p.id))}
           onInject={(name) => guard(name, async () => { setActiveStep(null); await api.inject(name); })}
           onInvestigate={() => guard("run", async () => { setActiveStep(null); await api.run(provider || undefined); })}
           onReset={(keep) => guard("reset", async () => { setActiveStep(null); await api.reset(keep); })}

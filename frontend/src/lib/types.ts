@@ -91,6 +91,7 @@ export interface Health {
   falkordb: { ok: boolean; services?: number; error?: string };
   graph: string;
   llm: string;
+  providers?: string[];
   tools: string[];
   running: boolean;
 }

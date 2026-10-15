@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from ..agent.llm import make_llm
+from ..agent.llm import available_providers, make_llm
 from ..agent.loop import investigate
 from ..agent.mcp_client import GraphToolbox
 from ..config import settings
@@ -121,7 +121,8 @@ async def health() -> dict:
         llm = make_llm().name
     except RuntimeError as exc:
         llm = f"unavailable: {exc}"
-    return {"falkordb": db, "graph": settings.graph_name, "llm": llm,
+    providers = await asyncio.to_thread(available_providers)
+    return {"falkordb": db, "graph": settings.graph_name, "llm": llm, "providers": providers,
             "tools": runs.toolbox.names if runs.toolbox else [], "running": runs.busy}
 
 

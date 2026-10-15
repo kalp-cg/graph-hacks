@@ -258,6 +258,19 @@ python -m sentinel.agent.cli --scenario db-pool-exhaustion --provider ollama --a
 pytest -q                                         # 55 tests against a real FalkorDB (graph 'sentinel_test')
 ```
 
+### Deploy (FalkorDB Cloud + Render + Vercel)
+
+1. **FalkorDB Cloud:** create an instance and seed it once from your machine:
+   `FALKORDB_HOST=… FALKORDB_PORT=… FALKORDB_USERNAME=… FALKORDB_PASSWORD=… python -m sentinel.seed --if-empty`
+   (the API container also seeds on start if the graph is empty).
+2. **Render (API):** *New → Blueprint →* this repo. [`render.yaml`](render.yaml) builds `backend/Dockerfile` and asks
+   for the secrets: `FALKORDB_HOST`, `FALKORDB_PORT`, `FALKORDB_USERNAME`, `FALKORDB_PASSWORD`, `GEMINI_API_KEY`.
+   Check `https://<service>.onrender.com/api/health`.
+3. **Vercel (UI):** import the repo, set **Root Directory = `frontend`**, add env
+   `NEXT_PUBLIC_API_URL=https://<service>.onrender.com`, deploy.
+
+On Render's free plan the API sleeps after ~15 min idle, so the first request takes ~1 min to wake it.
+
 ### Use the tools from Claude Desktop / Cursor
 
 ```json
