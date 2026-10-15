@@ -29,10 +29,15 @@ class ToolCall:
 class LLMReply:
     content: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
+    # The provider's tool calls exactly as received. Gemini 3 attaches a thought_signature to each call and
+    # rejects the next request unless it comes back unchanged, so we replay them verbatim.
+    raw_tool_calls: list[dict] | None = None
 
     def as_message(self) -> dict:
         msg: dict[str, Any] = {"role": "assistant", "content": self.content}
-        if self.tool_calls:
+        if self.raw_tool_calls:
+            msg["tool_calls"] = self.raw_tool_calls
+        elif self.tool_calls:
             msg["tool_calls"] = [
                 {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": json.dumps(c.args)}}
                 for c in self.tool_calls
@@ -121,10 +126,13 @@ class OpenAICompatLLM:
         data = await _post_with_retry(self._client, f"{self.base_url}/chat/completions", body,
                                       {"Authorization": f"Bearer {self.api_key}"})
         msg = data["choices"][0]["message"]
-        calls = [ToolCall(id=c.get("id") or f"call_{uuid.uuid4().hex[:8]}", name=c["function"]["name"],
-                          args=_parse_args(c["function"].get("arguments")))
-                 for c in msg.get("tool_calls") or []]
-        return LLMReply(content=(msg.get("content") or "").strip(), tool_calls=calls)
+        raw = msg.get("tool_calls") or []
+        for c in raw:  # every call needs an id so tool results can refer to it
+            c.setdefault("id", f"call_{uuid.uuid4().hex[:8]}")
+            c.setdefault("type", "function")
+        calls = [ToolCall(id=c["id"], name=c["function"]["name"], args=_parse_args(c["function"].get("arguments")))
+                 for c in raw]
+        return LLMReply(content=(msg.get("content") or "").strip(), tool_calls=calls, raw_tool_calls=raw or None)
 
 
 GEMINI_OPENAI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
