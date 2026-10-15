@@ -48,6 +48,7 @@ def find_common_cause(services: list[str], graph: Graph | None = None) -> dict:
     candidates = rows(g, COMMON_CAUSE_CYPHER, {"services": names, "n": len(names)})
     for c in candidates:
         c["likely_root_cause"] = c.pop("rank") == 2
+        c["total_hops"] = int(c["total_hops"])  # FalkorDB's sum() returns a float
         c.pop("is_down")
     node_uids = [f"svc:{n}" for n in names]
     edge_uids: list[str] = []
