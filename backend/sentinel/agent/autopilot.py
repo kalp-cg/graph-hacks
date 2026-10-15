@@ -51,7 +51,7 @@ class Autopilot:
         if "get_active_alerts" not in done:
             return call("get_active_alerts")
         alerts = last["get_active_alerts"] if isinstance(last["get_active_alerts"], list) else []
-        services = sorted({a["service"] for a in alerts})
+        services = sorted({a["service"] for a in alerts if isinstance(a, dict) and "service" in a})
         if not services:
             return LLMReply(content="**All clear.** No alerts are firing, so there is nothing to investigate.")
 
@@ -60,7 +60,7 @@ class Autopilot:
         common_res = last.get("find_common_cause") or {}
         if not isinstance(common_res, dict):
             common_res = {}
-        candidates = common_res.get("candidates") or []
+        candidates = [c for c in (common_res.get("candidates") or []) if isinstance(c, dict)]
         if not candidates:
             return LLMReply(content="No shared dependency found for the alerting services; escalating to a human.")
         top = candidates[0]["name"]
@@ -71,14 +71,14 @@ class Autopilot:
         if not isinstance(recall_res, dict):
             recall_res = {}
         repeat = next((i for i in (recall_res.get("incidents") or [])
-                       if i.get("root_cause_service") == top), None)
+                       if isinstance(i, dict) and i.get("root_cause_service") == top), None)
 
         if "recent_changes" not in done:
             return call("recent_changes", services=[top], minutes=60)
         recent_res = last.get("recent_changes") or {}
         if not isinstance(recent_res, dict):
             recent_res = {}
-        changes = recent_res.get("changes") or []
+        changes = [c for c in (recent_res.get("changes") or []) if isinstance(c, dict)]
         change = changes[0] if changes else None
 
         if not repeat:
@@ -95,7 +95,7 @@ class Autopilot:
             kinds = ["rollback"] if change else ["open_breaker", "scale_up"]
         if "page_oncall" not in kinds:
             kinds.append("page_oncall")
-        proposed = {args.get("kind") for name, args, _ in h if name == "propose_action"}
+        proposed = {args.get("kind") for name, args, _ in h if name == "propose_action" and isinstance(args, dict)}
         why = (f"{change['version']} '{change['message']}' by {change['author']} deployed "
                f"{change['minutes_ago']} min before the alerts" if change
                else f"{top} is the deepest unhealthy dependency shared by {', '.join(services)}")
@@ -119,8 +119,11 @@ class Autopilot:
         evidence = (f"Alerts on {', '.join(f'`svc:{s}`' for s in services)} → `find_common_cause` → all of them "
                     f"depend on `svc:{top}`, the deepest unhealthy shared dependency.")
         blast = last.get("blast_radius") or {}
-        impact = (f"{blast.get('count')} upstream services at risk ({', '.join(f'{v} {k}' for k, v in blast.get('by_tier', {}).items())})."
-                  if blast else f"{len(services)} alerting services.")
+        if not isinstance(blast, dict):
+            blast = {}
+        by_tier = blast.get("by_tier") if isinstance(blast.get("by_tier"), dict) else {}
+        impact = (f"{blast.get('count')} upstream services at risk ({', '.join(f'{v} {k}' for k, v in by_tier.items())})."
+                  if blast and blast.get("count") is not None else f"{len(services)} alerting services.")
         memory = (f"Repeat of **{repeat['id']}** ({repeat['title']}); last time it took {repeat['steps_taken']} steps."
                   if repeat else "No past incident with this root cause; this one is now stored as memory.")
         return (f"**Root cause**: {cause}\n\n**Evidence**: {evidence}\n\n**Impact**: {impact}\n\n"

@@ -67,9 +67,16 @@ async def _post_with_retry(client: httpx.AsyncClient, url: str, body: dict, head
     for attempt in range(4):
         resp = await client.post(url, json=body, headers=headers or {})
         if resp.status_code in (429, 500, 502, 503) and attempt < 3:
-            log.warning("LLM %s returned %s, retrying in %.0fs", url, resp.status_code, delay)
-            await asyncio.sleep(delay)
-            delay *= 2
+            wait_s = delay
+            retry_header = resp.headers.get("retry-after")
+            if retry_header:
+                try:
+                    wait_s = max(float(retry_header), delay)
+                except (ValueError, TypeError):
+                    pass
+            log.warning("LLM %s returned %s, retrying in %.1fs", url, resp.status_code, wait_s)
+            await asyncio.sleep(wait_s)
+            delay = max(delay * 2, wait_s + 1.0)
             continue
         if resp.status_code >= 400:
             raise RuntimeError(f"LLM error {resp.status_code}: {resp.text[:300]}")

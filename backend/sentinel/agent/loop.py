@@ -45,6 +45,8 @@ def compact_for_llm(res: dict) -> str:
 
 def summarize(name: str, res: dict) -> str:
     """One human line per tool result for the trail."""
+    if not isinstance(res, dict):
+        return str(res)
     if "error" in res:
         hint = f" (did you mean {', '.join(res['did_you_mean'])}?)" if res.get("did_you_mean") else ""
         return f"⚠ {res.get('message', res['error'])}{hint}"
@@ -100,21 +102,25 @@ class RunState:
         self.tool_calls = 0
 
     def observe(self, name: str, res: dict) -> None:
-        r = res.get("result")
-        if "error" in res or r is None and name != "conclude_investigation":
+        if not isinstance(res, dict):
             return
-        if name == "get_active_alerts":
-            self.services = sorted({a["service"] for a in r})
-        elif name == "find_common_cause" and r.get("candidates"):
-            self.suspect = r["candidates"][0]["name"]
-        elif name == "recall_similar" and r.get("incidents"):
+        r = res.get("result")
+        if "error" in res or (r is None and name != "conclude_investigation"):
+            return
+        if name == "get_active_alerts" and isinstance(r, list):
+            self.services = sorted({a["service"] for a in r if isinstance(a, dict) and "service" in a})
+        elif name == "find_common_cause" and isinstance(r, dict) and r.get("candidates"):
+            c = [x for x in r["candidates"] if isinstance(x, dict)]
+            if c:
+                self.suspect = c[0]["name"]
+        elif name == "recall_similar" and isinstance(r, dict) and r.get("incidents"):
             # The best match with the same root cause as the graph's suspect (not just the top score).
             for inc in r["incidents"]:
-                if self.suspect and inc.get("root_cause_service") == self.suspect:
+                if isinstance(inc, dict) and self.suspect and inc.get("root_cause_service") == self.suspect:
                     self.repeat = {"id": inc["id"], "title": inc["title"], "steps_taken": inc["steps_taken"],
                                    "fixes": inc.get("fixes", [])}
                     break
-        elif name == "propose_action":
+        elif name == "propose_action" and isinstance(r, dict) and "action" in r:
             self.proposed.append(r["action"])
         elif name == "conclude_investigation":
             self.concluded = True
