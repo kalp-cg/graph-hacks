@@ -27,6 +27,7 @@ graph LR
   Incident -- FOLLOWED --> Runbook
   Runbook -- APPLIES_TO --> Service
   Action -- TARGETS --> Service
+  Incident -- PAGED --> Page
   Page -- NOTIFIED --> Person
 ```
 
@@ -41,7 +42,7 @@ graph LR
 | `Deployment` | `dep:<service>:<version>` | `version`, `at` (epoch ms), `status` (live/rolled_back), `change_summary` |
 | `Commit` | `commit:<sha>` | `sha`, `message`, `files_changed` |
 | `Alert` | `alert:<id>` | `id`, `metric`, `value`, `threshold`, `at`, `status` (firing/resolved) |
-| `Incident` | `inc:<id>` | `id`, `title`, `severity`, `status` (open/mitigated/resolved), `opened_at`, `resolved_at`, `summary`, `steps_taken` |
+| `Incident` | `inc:<id>` | `id`, `title`, `severity`, `status` (investigating/mitigating/resolved/abandoned), `opened_at`, `resolved_at`, `summary`, `steps_taken`, `run_id`, `learned` |
 | `Action` | `act:<id>` | `kind` (rollback/open_breaker/page_oncall/scale_up), `status` (pending/approved/rejected/executed/failed), `reason`, `risk` |
 | `Runbook` | `rb:<slug>` | `title`, `steps` |
 | `Page` | `page:<id>` | `at`, `message`, `channel` |
@@ -67,6 +68,7 @@ graph LR
 | `(Incident)-[:FOLLOWED]->(Runbook)` | | |
 | `(Runbook)-[:APPLIES_TO]->(Service)` | | Procedural memory |
 | `(Action)-[:TARGETS]->(Service\|Deployment)` | | Audit trail |
+| `(Incident)-[:PAGED]->(Page)` | | Pages sent during the incident |
 | `(Page)-[:NOTIFIED]->(Person)` | | |
 
 > **Direction:** `(checkout-api)-[:DEPENDS_ON]->(inventory-db-proxy)`. The blast radius of a broken `X` is everything

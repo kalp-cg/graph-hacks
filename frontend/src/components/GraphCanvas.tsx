@@ -19,7 +19,7 @@ interface Props {
   onSelect: (node: GNode | null) => void;
 }
 
-const LAYER_Y: Record<string, number> = { edge: -300, business: -90, data: 170, platform: 300 };
+const LAYER_Y: Record<string, number> = { edge: -340, business: -100, data: 170, platform: 340 };
 const INFRA = new Set(["Service", "Database"]);
 const RECENT_MS = 2 * 60 * 60 * 1000;
 const CONTEXT_LINK = (t: string) => !["DEPENDS_ON", "READS_FROM", "WRITES_TO"].includes(t);
@@ -29,7 +29,7 @@ function endId(end: L["source"]): string {
 }
 
 function radius(n: N): number {
-  if (n.type === "Service") return 4.5 + 20 * Math.sqrt(n.pagerank ?? 0.01);
+  if (n.type === "Service") return 5.5 + 22 * Math.sqrt(n.pagerank ?? 0.01);
   if (n.type === "Database") return 5;
   if (n.type === "Incident" || n.type === "Deployment") return 4.5;
   return 3.5;
@@ -114,14 +114,14 @@ export default function GraphCanvas({ data, highlight, flashes, focus, showConte
     const g = fg.current;
     if (!g) return;
     g.d3Force("y", forceY<N>((n) => (n.layer ? LAYER_Y[n.layer] ?? 0 : n.type === "Database" ? 380 : 0))
-      .strength((n) => (INFRA.has(n.type) ? 0.22 : 0)));
+      .strength((n) => (INFRA.has(n.type) ? 0.3 : 0)));
     g.d3Force("collide", forceCollide<N>((n) => radius(n) + 4));
     g.d3Force("x", forceX<N>(0).strength((n) => (INFRA.has(n.type) ? 0.015 : 0)));
     const charge = g.d3Force("charge");
-    charge?.strength?.((n: N) => (INFRA.has(n.type) ? -150 : -40));
+    charge?.strength?.((n: N) => (INFRA.has(n.type) ? -320 : -40));
     const link = g.d3Force("link");
-    link?.distance?.((l: L) => (l.type === "DEPENDS_ON" ? 55 : 28));
-    link?.strength?.((l: L) => (l.type === "DEPENDS_ON" ? 0.25 : l.type === "OWNS" ? 0.03 : 0.6));
+    link?.distance?.((l: L) => (l.type === "DEPENDS_ON" ? 80 : 30));
+    link?.strength?.((l: L) => (l.type === "DEPENDS_ON" ? 0.12 : l.type === "OWNS" ? 0.02 : 0.6));
     g.d3ReheatSimulation();
   }, [data]);
 
@@ -177,7 +177,7 @@ export default function GraphCanvas({ data, highlight, flashes, focus, showConte
         onEngineStop={() => {
           if (!fitted.current) {
             fitted.current = true;
-            fg.current?.zoomToFit(700, 50, (n) => INFRA.has(n.type));
+            fg.current?.zoomToFit(700, 70, (n) => INFRA.has(n.type));
           }
         }}
         nodeVisibility={(n) => visible(n)}
@@ -281,7 +281,7 @@ function drawNode(n: N, ctx: CanvasRenderingContext2D, scale: number,
 
   const isInfra = n.type === "Service" || n.type === "Database";
   const named = n.type === "Deployment" || n.type === "Person";
-  const showLabel = current || unhealthy || o.selected || ((isInfra || named) && visited) || (isInfra && scale > 1.5) ||
+  const showLabel = current || unhealthy || o.selected || ((isInfra || named) && visited) || (n.type === "Service" && scale > 0.95) || (isInfra && scale > 1.5) ||
     (n.type === "Service" && (n.pagerank ?? 0) > 0.04 && scale > 0.8) || (!isInfra && scale > 2.2);
   if (showLabel) {
     const fontSize = Math.max(10 / scale, 2.2);
