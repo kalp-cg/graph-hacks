@@ -5,6 +5,13 @@
 
 **Graph Hacks: Context for AI Agents** (WeMakeDevs × FalkorDB) · **Track 01: Agents That Act on Connected Data**
 
+### 🌐 [Live demo: graph-hacks-alpha.vercel.app](https://graph-hacks-alpha.vercel.app/) · [API health](https://sentinelgraph-api-relh.onrender.com/api/health)
+
+UI on Vercel · API + agent on Render · graph on **FalkorDB Cloud** (ap-south-1).
+*The API runs on Render's free plan and sleeps when idle. If the first load says "reconnecting", give it about a
+minute to wake up.* Try it: **Break production → `db-pool-exhaustion`**, then **Investigate**, then **Approve**.
+Or right-click any service to break it yourself.
+
 ![SentinelGraph demo: inject an incident, the agent walks the graph, a human approves, the graph turns green](docs/images/demo.gif)
 
 <sub>Full-quality clip: [docs/images/demo.webm](docs/images/demo.webm)</sub>
