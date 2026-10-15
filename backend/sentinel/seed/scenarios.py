@@ -5,6 +5,7 @@ resolved (and the alerts, actions and deployments they point to) survive, so re-
 can be faster. `seed_baseline` (python -m sentinel.seed --reset) is the hard reset that wipes everything.
 """
 import random
+import uuid
 
 from falkordb import Graph
 
@@ -113,7 +114,7 @@ def inject_scenario(name: str, graph: Graph | None = None, now: int | None = Non
     graph.query("MATCH (s:Service {name: $name}) SET s.status = $status, s.root_fault = true",
                 {"name": root, "status": root_status})
 
-    stamp = now // 1000 % 100000  # keeps alert ids unique across re-runs
+    stamp = uuid.uuid4().hex[:6]  # unique per injection, even several in the same second
     alerts = [
         {"id": f"ALR-{stamp}-{i + 1}", "svc": svc, "metric": metric, "value": value, "threshold": threshold,
          "at": now - (3 - min(i, 2)) * MIN_MS}
@@ -162,7 +163,7 @@ def inject_chaos(service: str, mode: str = "down", with_deploy: bool = False, gr
                           "RETURN c.name AS name, c.tier AS tier, coalesce(c.revenue_per_min, 0) AS rev", {"n": service})
     callers.sort(key=lambda c: (TIER_RANK.get(c["tier"], 9), -c["rev"], c["name"]))
     alerting = [c["name"] for c in callers[:3]] or [service]
-    stamp = now // 1000 % 100000
+    stamp = uuid.uuid4().hex[:6]
     metric = ("p99_latency_ms", 4200, 600) if mode == "degraded" else ("error_rate", 0.42, 0.02)
     alerts = [{"id": f"ALR-{stamp}-{i + 1}", "svc": name, "metric": metric[0], "value": metric[1],
                "threshold": metric[2], "at": now - (3 - min(i, 2)) * MIN_MS} for i, name in enumerate(alerting)]

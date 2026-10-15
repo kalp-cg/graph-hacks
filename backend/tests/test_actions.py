@@ -97,3 +97,16 @@ def test_paging_does_not_heal_a_root_that_alerts_on_itself(graph):
     fix = propose_action("rollback", "cdn-edge", "x", graph=graph)["result"]["action"]["uid"]
     execute_action(fix, graph=graph)
     assert unhealthy(graph) == set() and firing(graph) == 0
+
+
+def test_concurrent_approvals_execute_once(graph):
+    import threading
+
+    inject_scenario("db-pool-exhaustion", graph, fresh=True)
+    uid = propose_action("page_oncall", "inventory-db-proxy", "x", graph=graph)["result"]["action"]["uid"]
+    results: list[dict] = []
+    threads = [threading.Thread(target=lambda: results.append(execute_action(uid, graph=graph))) for _ in range(6)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert sum(1 for r in results if "error" not in r) == 1
+    assert rows(graph, "MATCH (p:Page) RETURN count(p) AS n")[0]["n"] == 1

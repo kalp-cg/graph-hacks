@@ -62,3 +62,12 @@ def test_soft_reset_keeps_graph_stable(graph):
     assert firing == 3
     unhealthy = rows(graph, "MATCH (s:Service) WHERE s.status <> 'healthy' RETURN count(s) AS n")[0]["n"]
     assert unhealthy == 4
+
+
+def test_alert_ids_unique_across_fast_injections(graph):
+    from sentinel.seed.scenarios import inject_chaos
+
+    inject_scenario("db-pool-exhaustion", graph, fresh=True)
+    a = inject_chaos("pricing-service", "down", False, graph)
+    b = inject_chaos("pricing-service", "down", False, graph)
+    assert not set(a["alert_uids"]) & set(b["alert_uids"])

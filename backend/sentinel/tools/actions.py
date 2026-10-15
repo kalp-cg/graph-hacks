@@ -157,12 +157,26 @@ def _send_webhook(text: str) -> bool:
 def execute_action(uid: str, approved_by: str = "human", graph: Graph | None = None) -> dict:
     """Run an approved action against the graph, then let recovery and incident settlement follow."""
     g = graph_or_default(graph)
-    a = get_action(uid, g)
-    if not a:
-        return {"error": "not_found", "message": f"no action {uid}"}
-    if a["status"] != "pending":
+    # Claim the action atomically (FalkorDB serializes writes), so two simultaneous approvals
+    # (two tabs, a double click) can't both run it.
+    claimed = rows(g, "MATCH (a:Action {uid: $uid, status: 'pending'}) SET a.status = 'executing' RETURN a",
+                   {"uid": uid})
+    if not claimed:
+        a = get_action(uid, g)
+        if not a:
+            return {"error": "not_found", "message": f"no action {uid}"}
         return {"error": "not_pending", "message": f"action {uid} is {a['status']}"}
+    a = _action_view(claimed[0]["a"].properties)
+    try:
+        return _run_action(g, a, uid, approved_by)
+    except Exception as exc:
+        # Never leave an action stuck in 'executing'.
+        g.query("MATCH (a:Action {uid: $uid}) SET a.status = 'failed', a.outcome = $why, a.executed_at = $now",
+                {"uid": uid, "why": f"failed: {exc}"[:300], "now": now_ms()})
+        raise
 
+
+def _run_action(g: Graph, a: dict, uid: str, approved_by: str) -> dict:
     changed: list[str] = []
     edges: list[str] = []
     kind, target = a["kind"], a["target"]
