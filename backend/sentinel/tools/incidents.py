@@ -87,3 +87,9 @@ def settle_incidents(graph: Graph | None = None) -> list[str]:
         {"now": now_ms()},
     )
     return [d["id"] for d in done]
+
+
+def record_steps(run_id: str, steps: int, graph: Graph | None = None) -> None:
+    """Store the final step count (the model may keep acting after it concluded)."""
+    g = graph_or_default(graph)
+    g.query("MATCH (i:Incident {run_id: $run}) SET i.steps_taken = $steps", {"run": run_id, "steps": int(steps)})

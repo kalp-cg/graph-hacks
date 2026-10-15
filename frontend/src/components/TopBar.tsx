@@ -10,13 +10,14 @@ function fmt(ms: number) {
 
 interface Props {
   health: Health | null;
+  model: string | null;
   connected: boolean;
   incident: { openSince: number | null; resolvedIn: number | null; now: number };
   firing: number;
   unhealthy: number;
 }
 
-export default function TopBar({ health, connected, incident, firing, unhealthy }: Props) {
+export default function TopBar({ health, connected, model, incident, firing, unhealthy }: Props) {
   const open = incident.openSince !== null;
   return (
     <header className="glass relative z-20 flex h-14 shrink-0 items-center gap-4 rounded-xl px-4">
@@ -32,7 +33,7 @@ export default function TopBar({ health, connected, incident, firing, unhealthy 
         <Pill ok={!!health?.falkordb.ok} icon={<Database className="h-3.5 w-3.5" />}
               text={health?.falkordb.ok ? `FalkorDB · ${health.graph} · ${health.falkordb.services} services` : "FalkorDB offline"} />
         <Pill ok={!!health && !health.llm.startsWith("unavailable")} icon={<Activity className="h-3.5 w-3.5" />}
-              text={health ? health.llm : "LLM …"} />
+              text={model ? `run: ${model}` : health ? `default: ${health.llm}` : "LLM …"} />
         <Pill ok={connected} icon={<Radio className="h-3.5 w-3.5" />} text={connected ? "live" : "reconnecting"} />
         {health && <span className="text-slate-500">{health.tools.length} MCP tools</span>}
       </div>

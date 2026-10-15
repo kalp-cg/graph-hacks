@@ -64,8 +64,8 @@ class Autopilot:
 
         if "recall_similar" not in done:
             return call("recall_similar", services=services)
-        past = (last["recall_similar"].get("incidents") or [None])[0]
-        repeat = past if past and past.get("root_cause_service") == top else None
+        repeat = next((i for i in last["recall_similar"].get("incidents") or []
+                       if i.get("root_cause_service") == top), None)
 
         if "recent_changes" not in done:
             return call("recent_changes", services=[top], minutes=60)

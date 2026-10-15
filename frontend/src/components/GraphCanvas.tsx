@@ -280,7 +280,8 @@ function drawNode(n: N, ctx: CanvasRenderingContext2D, scale: number,
   }
 
   const isInfra = n.type === "Service" || n.type === "Database";
-  const showLabel = current || unhealthy || o.selected || (isInfra && visited) || (isInfra && scale > 1.5) ||
+  const named = n.type === "Deployment" || n.type === "Person";
+  const showLabel = current || unhealthy || o.selected || ((isInfra || named) && visited) || (isInfra && scale > 1.5) ||
     (n.type === "Service" && (n.pagerank ?? 0) > 0.04 && scale > 0.8) || (!isInfra && scale > 2.2);
   if (showLabel) {
     const fontSize = Math.max(10 / scale, 2.2);

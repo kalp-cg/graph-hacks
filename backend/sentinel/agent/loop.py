@@ -108,9 +108,12 @@ class RunState:
         elif name == "find_common_cause" and r.get("candidates"):
             self.suspect = r["candidates"][0]["name"]
         elif name == "recall_similar" and r.get("incidents"):
-            top = r["incidents"][0]
-            if self.suspect and top.get("root_cause_service") == self.suspect:
-                self.repeat = {"id": top["id"], "title": top["title"], "steps_taken": top["steps_taken"]}
+            # The best match with the same root cause as the graph's suspect (not just the top score).
+            for inc in r["incidents"]:
+                if self.suspect and inc.get("root_cause_service") == self.suspect:
+                    self.repeat = {"id": inc["id"], "title": inc["title"], "steps_taken": inc["steps_taken"],
+                                   "fixes": inc.get("fixes", [])}
+                    break
         elif name == "propose_action":
             self.proposed.append(r["action"])
         elif name == "conclude_investigation":
@@ -182,7 +185,17 @@ async def investigate(question: str, emit: Emit, toolbox: GraphToolbox, llm: LLM
             })
             if call.name == "propose_action" and "error" not in res:
                 await send({"type": "action_proposed", "action": res["result"]["action"], "note": res["result"].get("note")})
-            messages.append({"role": "tool", "tool_call_id": call.id, "content": compact_for_llm(res)})
+            content = compact_for_llm(res)
+            if call.name == "recall_similar" and state.repeat:
+                # Memory-guided planning: spell out what the graph memory means for this run.
+                r = state.repeat
+                hint = (f"{r['id']} had the same root cause ({state.suspect}) and was fixed by "
+                            f"{', '.join(r['fixes']) or 'the recorded actions'} in {r['steps_taken']} steps. This is a "
+                            f"REPEAT: call recent_changes for {state.suspect} to confirm, then propose those fixes "
+                            f"(rollback only if there is a recent deployment) and page_oncall, then conclude with "
+                            f"similar_incident={r['id']}. Skip further exploration.")
+                content = json.dumps({**json.loads(content), "memory_match": hint})
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": content})
     else:
         report = report or "Stopped after the maximum number of steps."
 
@@ -191,6 +204,9 @@ async def investigate(question: str, emit: Emit, toolbox: GraphToolbox, llm: LLM
         await asyncio.to_thread(incidents.conclude_incident, run_id, state.suspect,
                                 f"Shared unhealthy dependency of {', '.join(state.services)}: {state.suspect}.",
                                 state.tool_calls, state.repeat["id"] if state.repeat else None)
+
+    if incident:
+        await asyncio.to_thread(incidents.record_steps, run_id, state.tool_calls)
 
     final = {"type": "final", "report": report or "(no report)", "provider": llm.name, "steps": state.tool_calls,
              "root_cause": state.suspect, "incident": incident, "repeat_of": state.repeat,

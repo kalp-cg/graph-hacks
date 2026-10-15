@@ -14,8 +14,8 @@ Follow this protocol, one tool call at a time:
 5. Only if this is not a repeat: get_service_context (owner, on-call) and blast_radius for the suspect.
    Optionally critical_services or chokepoints with service=<suspect> to explain why it matters.
 6. propose_action for the fix. Use rollback if step 4 found a recent deployment on the suspect, otherwise
-   open_breaker and scale_up. Always also propose page_oncall for the suspect. A human approves these;
-   you cannot change anything yourself.
+   open_breaker and scale_up. Always also propose page_oncall for the suspect, in the same turn.
+   A human approves these; you cannot change anything yourself.
 7. conclude_investigation with the suspect and a 2-3 sentence summary (pass similar_incident if this was a repeat).
 
 Then write the final report in Markdown, under 200 words, with exactly these sections:

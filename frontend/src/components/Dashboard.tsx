@@ -177,7 +177,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-full flex-col gap-2 p-2">
-      <TopBar health={health} connected={connected} firing={alerts.length} unhealthy={unhealthy}
+      <TopBar health={health} connected={connected} model={run.provider} firing={alerts.length} unhealthy={unhealthy}
               incident={{ openSince, resolvedIn: openSince === null ? resolvedIn : null, now }} />
       <div className="flex min-h-0 flex-1 gap-2">
         <ControlPanel
