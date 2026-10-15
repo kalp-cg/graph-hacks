@@ -1,81 +1,84 @@
 "use client";
 
-import { Activity, Database, Radio, ShieldCheck, Timer } from "lucide-react";
 import type { Health } from "@/lib/types";
 
-function fmt(ms: number) {
+export type ApiState = "connecting" | "up" | "down";
+
+export const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
+
+export function clock(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
 interface Props {
   health: Health | null;
+  api: ApiState;
+  socket: boolean;
   model: string | null;
-  connected: boolean;
-  incident: { openSince: number | null; resolvedIn: number | null; now: number };
-  firing: number;
-  unhealthy: number;
-  cost: { perMin: number; total: number };
+  incident:
+    | { state: "quiet" }
+    | { state: "open"; since: number; now: number; alerts: number; unhealthy: number; lost: number; perMin: number }
+    | { state: "resolved"; mttr: number; lost: number };
 }
 
-const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
-
-export default function TopBar({ health, connected, model, incident, firing, unhealthy, cost }: Props) {
-  const open = incident.openSince !== null;
+export default function TopBar({ health, api, socket, model, incident }: Props) {
+  const db = api === "up" && health?.falkordb.ok;
+  const modelName = (model ?? health?.llm ?? "").replace(" (deterministic, no LLM)", "");
   return (
-    <header className="glass relative z-20 flex h-14 shrink-0 items-center gap-4 rounded-xl px-4">
+    <header className="flex h-12 shrink-0 items-center gap-5 border-b border-line px-4">
       <div className="flex items-center gap-2">
-        <ShieldCheck className="h-6 w-6 text-cyan-300" />
-        <div className="leading-tight">
-          <div className="text-[15px] font-semibold tracking-tight">SentinelGraph</div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">incident commander on FalkorDB</div>
-        </div>
+        <span className="h-2.5 w-2.5 rotate-45 bg-brand" />
+        <span className="text-[14px] font-semibold tracking-tight">sentinelgraph</span>
       </div>
 
-      <div className="ml-4 flex items-center gap-2 text-xs">
-        <Pill ok={!!health?.falkordb.ok} icon={<Database className="h-3.5 w-3.5" />}
-              text={health?.falkordb.ok ? `FalkorDB · ${health.graph} · ${health.falkordb.services} services` : "FalkorDB offline"} />
-        <Pill ok={!!health && !health.llm.startsWith("unavailable")} icon={<Activity className="h-3.5 w-3.5" />}
-              text={model ? `run: ${model}` : health ? `default: ${health.llm}` : "LLM …"} />
-        <Pill ok={connected} icon={<Radio className="h-3.5 w-3.5" />} text={connected ? "live" : "reconnecting"} />
-        {health && <span className="text-slate-500">{health.tools.length} MCP tools</span>}
+      <div className="flex items-center gap-4 text-[12px] text-muted">
+        <Status ok={!!db} warn={api === "connecting"}
+                label={api === "down" ? "api unreachable" : api === "connecting" ? "connecting…"
+                  : db ? `falkordb · ${health?.falkordb.services} services` : "falkordb down"} />
+        {api === "up" && <Status ok={socket} label={socket ? "live" : "reconnecting"} />}
+        {api === "up" && modelName && (
+          <span className="hidden font-mono text-[11.5px] text-faint lg:inline">
+            {model ? "run" : "model"}: {modelName}
+          </span>
+        )}
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
-        {open ? (
-          <div className="flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-red-300">Incident</span>
-            <span className="text-xs text-red-200/80">{firing} alerts · {unhealthy} unhealthy</span>
-            <span className="ml-1 border-l border-red-500/30 pl-2 font-mono text-sm tabular-nums text-red-100" title="Revenue at risk, summed over unhealthy services">
-              {usd(cost.total)} <span className="text-[10px] text-red-300/80">lost · {usd(cost.perMin)}/min</span>
+      <div className="ml-auto">
+        {incident.state === "open" ? (
+          <div className="flex items-center gap-3 font-mono text-[12px]" data-testid="incident-open">
+            <span className="flex items-center gap-1.5 font-sans font-semibold text-crit">
+              <span className="blink h-2 w-2 rounded-full bg-crit" /> Incident
             </span>
-            <Timer className="ml-1 h-3.5 w-3.5 text-red-300" />
-            <span className="font-mono text-sm tabular-nums text-red-100">{fmt(incident.now - (incident.openSince ?? 0))}</span>
+            <span className="text-muted">{incident.alerts} alerts · {incident.unhealthy} unhealthy</span>
+            <span className="text-ink" title="Revenue at risk on unhealthy services" data-testid="cost">
+              {usd(incident.lost)} <span className="text-faint">· {usd(incident.perMin)}/min</span>
+            </span>
+            <span className="tabular-nums text-ink">{clock(incident.now - incident.since)}</span>
           </div>
-        ) : incident.resolvedIn !== null ? (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Recovered</span>
-            <span className="text-xs text-emerald-200/80">cost {usd(cost.total)} · MTTR</span>
-            <span className="font-mono text-sm tabular-nums text-emerald-100">{fmt(incident.resolvedIn)}</span>
+        ) : incident.state === "resolved" ? (
+          <div className="flex items-center gap-3 font-mono text-[12px]" data-testid="incident-resolved">
+            <span className="flex items-center gap-1.5 font-sans font-semibold text-ok">
+              <span className="h-2 w-2 rounded-full bg-ok" /> Recovered
+            </span>
+            <span className="text-muted">MTTR <span className="text-ink">{clock(incident.mttr)}</span></span>
+            <span className="text-muted">cost <span className="text-ink">{usd(incident.lost)}</span></span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/25 px-3 py-1.5 text-xs text-emerald-300/80">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" /> All systems operational
-          </div>
+          <span className="flex items-center gap-1.5 text-[12px] text-muted" data-testid="incident-quiet">
+            <span className="h-2 w-2 rounded-full bg-ok/80" /> All quiet
+          </span>
         )}
       </div>
     </header>
   );
 }
 
-function Pill({ ok, icon, text }: { ok: boolean; icon: React.ReactNode; text: string }) {
+function Status({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
   return (
-    <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${ok
-      ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-200/90" : "border-amber-500/30 bg-amber-500/10 text-amber-200"}`}>
-      {icon}
-      <span className="max-w-[260px] truncate">{text}</span>
+    <span className="flex items-center gap-1.5">
+      <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-ok" : warn ? "blink bg-warn" : "bg-crit"}`} />
+      {label}
     </span>
   );
 }

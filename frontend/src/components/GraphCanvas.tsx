@@ -3,7 +3,7 @@
 import { forceCollide, forceX, forceY } from "d3-force";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
-import { STATUS_COLOR, TYPE_COLOR, type Highlight } from "@/lib/graphStyle";
+import { C, STATUS_COLOR, TYPE_COLOR, type Highlight } from "@/lib/graphStyle";
 import type { GLink, GNode } from "@/lib/types";
 
 type N = NodeObject<GNode>;
@@ -191,23 +191,24 @@ export default function GraphCanvas({ data, highlight, flashes, focus, showConte
         }}
         onBackgroundClick={() => onSelect(null)}
         linkColor={(l) => {
-          if (highlight.currentEdges.has(l.id as string)) return "rgba(34,211,238,0.95)";
-          if (highlight.edges.has(l.id as string)) return "rgba(34,211,238,0.55)";
-          if (l.breaker === "open") return "rgba(251,146,60,0.9)";
-          if (unhealthyTarget(l)) return "rgba(239,68,68,0.45)";
-          if (l.type === "DEPENDS_ON") return "rgba(148,163,184,0.16)";
-          return "rgba(148,163,184,0.22)";
+          const id = l.id as string;
+          if (highlight.currentEdges.has(id)) return "rgba(122,162,255,0.95)";
+          if (highlight.edges.has(id)) return "rgba(122,162,255,0.6)";
+          if (l.breaker === "open") return "rgba(240,169,46,0.85)";
+          if (unhealthyTarget(l)) return "rgba(240,82,79,0.4)";
+          if (l.type === "DEPENDS_ON") return "rgba(139,144,153,0.16)";
+          return "rgba(139,144,153,0.22)";
         }}
-        linkWidth={(l) => (highlight.currentEdges.has(l.id as string) ? 2.6 : highlight.edges.has(l.id as string) ? 1.8
-          : l.breaker === "open" ? 1.6 : unhealthyTarget(l) ? 1.2 : 0.6)}
-        linkLineDash={(l) => (l.breaker === "open" ? [3, 3] : CONTEXT_LINK(l.type) ? [2, 2] : null)}
+        linkWidth={(l) => (highlight.currentEdges.has(l.id as string) ? 2.2 : highlight.edges.has(l.id as string) ? 1.5
+          : l.breaker === "open" ? 1.4 : unhealthyTarget(l) ? 1 : 0.6)}
+        linkLineDash={(l) => (l.breaker === "open" ? [4, 3] : CONTEXT_LINK(l.type) ? [2, 2] : null)}
         linkDirectionalArrowLength={(l) => (l.type === "DEPENDS_ON" ? 2.5 : 0)}
         linkDirectionalArrowRelPos={0.92}
-        linkDirectionalArrowColor={() => "rgba(148,163,184,0.35)"}
-        linkDirectionalParticles={(l) => (highlight.edges.has(l.id as string) ? 3 : unhealthyTarget(l) ? 2 : 0)}
-        linkDirectionalParticleWidth={(l) => (highlight.edges.has(l.id as string) ? 2.4 : 1.8)}
-        linkDirectionalParticleSpeed={(l) => (highlight.edges.has(l.id as string) ? 0.012 : 0.006)}
-        linkDirectionalParticleColor={(l) => (highlight.edges.has(l.id as string) ? "#67e8f9" : "#f87171")}
+        linkDirectionalArrowColor={() => "rgba(139,144,153,0.35)"}
+        linkDirectionalParticles={(l) => (highlight.edges.has(l.id as string) ? 2 : unhealthyTarget(l) ? 1 : 0)}
+        linkDirectionalParticleWidth={(l) => (highlight.edges.has(l.id as string) ? 2 : 1.6)}
+        linkDirectionalParticleSpeed={(l) => (highlight.edges.has(l.id as string) ? 0.01 : 0.005)}
+        linkDirectionalParticleColor={(l) => (highlight.edges.has(l.id as string) ? C.agent : C.crit)}
         nodeCanvasObject={(n, ctx, scale) => drawNode(n, ctx, scale, {
           highlight, flashes, chokepoint: chokepoints.has(n.id), selected: n.id === selected,
         })}
@@ -227,79 +228,81 @@ function drawNode(n: N, ctx: CanvasRenderingContext2D, scale: number,
   const y = n.y ?? 0;
   const r = radius(n);
   const t = performance.now();
+  const lw = (w: number) => w / Math.max(scale, 0.7);
+  const isInfra = n.type === "Service" || n.type === "Database";
   const status = n.status ?? "healthy";
-  const statusColor = n.type === "Service" || n.type === "Database" ? STATUS_COLOR[status] ?? "#10b981" : TYPE_COLOR[n.type];
+  const unhealthy = isInfra && status !== "healthy";
+  const color = isInfra ? STATUS_COLOR[status] ?? C.ok : TYPE_COLOR[n.type];
   const visited = o.highlight.visited.has(n.id);
   const current = o.highlight.current.has(n.id);
-  const unhealthy = (n.type === "Service" || n.type === "Database") && status !== "healthy";
 
-  // Halo: pulsing for unhealthy services, steady for anything the agent touched.
+  // Only real failures move: a slow, soft pulse ring.
   if (unhealthy) {
-    const pulse = 0.5 + 0.5 * Math.sin(t / (status === "down" ? 180 : 320));
+    const k = (t % (status === "down" ? 1300 : 2000)) / (status === "down" ? 1300 : 2000);
     ctx.beginPath();
-    ctx.arc(x, y, r + 4 + pulse * 5, 0, 2 * Math.PI);
-    ctx.fillStyle = status === "down" ? `rgba(239,68,68,${0.12 + pulse * 0.18})` : `rgba(245,158,11,${0.1 + pulse * 0.14})`;
-    ctx.fill();
+    ctx.arc(x, y, r + 2 + k * 9, 0, 2 * Math.PI);
+    ctx.strokeStyle = status === "down" ? `rgba(240,82,79,${0.55 * (1 - k)})` : `rgba(240,169,46,${0.45 * (1 - k)})`;
+    ctx.lineWidth = lw(1.5);
+    ctx.stroke();
   }
   if (current) {
-    const k = (t % 1400) / 1400;
     ctx.beginPath();
-    ctx.arc(x, y, r + 3 + k * 14, 0, 2 * Math.PI);
-    ctx.strokeStyle = `rgba(103,232,249,${0.9 * (1 - k)})`;
-    ctx.lineWidth = 1.6 / Math.max(scale, 0.6);
+    ctx.arc(x, y, r + 4, 0, 2 * Math.PI);
+    ctx.strokeStyle = `rgba(122,162,255,${0.5 + 0.4 * Math.sin(t / 220)})`;
+    ctx.lineWidth = lw(1.5);
     ctx.stroke();
   }
   const flashAt = o.flashes.get(n.id);
   if (flashAt) {
-    const k = (Date.now() - flashAt) / 1800;
+    const k = (Date.now() - flashAt) / 1600;
     if (k < 1) {
       ctx.beginPath();
-      ctx.arc(x, y, r + 2 + k * 22, 0, 2 * Math.PI);
-      ctx.strokeStyle = `rgba(52,211,153,${1 - k})`;
-      ctx.lineWidth = 2.5 / Math.max(scale, 0.6);
+      ctx.arc(x, y, r + 2 + k * 16, 0, 2 * Math.PI);
+      ctx.strokeStyle = `rgba(62,207,142,${0.9 * (1 - k)})`;
+      ctx.lineWidth = lw(2);
       ctx.stroke();
     }
   }
 
-  ctx.save();
-  if (visited || unhealthy || o.selected) {
-    ctx.shadowColor = visited ? "#22d3ee" : statusColor;
-    ctx.shadowBlur = visited ? 14 : 10;
-  }
   shape(ctx, n, r);
-  ctx.fillStyle = n.type === "Service" && !unhealthy ? "rgba(16,185,129,0.28)" : statusColor + (n.type === "Service" ? "dd" : "cc");
+  if (n.type === "Service") {
+    ctx.fillStyle = unhealthy ? color : "#16241e";
+  } else if (n.type === "Database") {
+    ctx.fillStyle = unhealthy ? color : "#1c1f25";
+  } else {
+    ctx.fillStyle = color;
+  }
   ctx.fill();
-  ctx.lineWidth = (visited ? 1.8 : 1.1) / Math.max(scale, 0.7);
-  ctx.strokeStyle = visited ? "#a5f3fc" : o.selected ? "#ffffff" : statusColor;
+  ctx.lineWidth = lw(visited || o.selected ? 1.8 : 1);
+  ctx.strokeStyle = o.selected ? C.ink : visited ? C.agent : isInfra ? color : "rgba(0,0,0,0.4)";
   ctx.stroke();
-  ctx.restore();
 
   if (o.chokepoint && n.type === "Service") {
     ctx.beginPath();
     ctx.setLineDash([2, 2]);
-    ctx.arc(x, y, r + 3, 0, 2 * Math.PI);
-    ctx.strokeStyle = "rgba(226,232,240,0.45)";
-    ctx.lineWidth = 0.8 / Math.max(scale, 0.7);
+    ctx.arc(x, y, r + 2.5, 0, 2 * Math.PI);
+    ctx.strokeStyle = "rgba(231,232,235,0.35)";
+    ctx.lineWidth = lw(0.8);
     ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  const isInfra = n.type === "Service" || n.type === "Database";
   const named = n.type === "Deployment" || n.type === "Person";
-  const showLabel = current || unhealthy || o.selected || ((isInfra || named) && visited) || (n.type === "Service" && scale > 0.95) || (isInfra && scale > 1.5) ||
+  const showLabel = current || unhealthy || o.selected || ((isInfra || named) && visited) ||
+    (n.type === "Service" && scale > 0.95) || (isInfra && scale > 1.5) ||
     (n.type === "Service" && (n.pagerank ?? 0) > 0.04 && scale > 0.8) || (!isInfra && scale > 2.2);
-  if (showLabel) {
-    const fontSize = Math.max(10 / scale, 2.2);
-    ctx.font = `${visited || unhealthy ? 600 : 400} ${fontSize}px ui-sans-serif, system-ui`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const label = n.label.length > 32 ? n.label.slice(0, 31) + "…" : n.label;
-    ctx.fillStyle = "rgba(2,6,23,0.75)";
-    const w = ctx.measureText(label).width;
-    ctx.fillRect(x - w / 2 - 1.5, y + r + 2, w + 3, fontSize + 2);
-    ctx.fillStyle = visited ? "#cffafe" : unhealthy ? (status === "down" ? "#fecaca" : "#fde68a") : "#cbd5e1";
-    ctx.fillText(label, x, y + r + 3);
-  }
+  if (!showLabel) return;
+  const strong = visited || unhealthy || o.selected;
+  const fontSize = Math.max(10.5 / scale, 2.2);
+  ctx.font = `${strong ? 600 : 400} ${fontSize}px ui-sans-serif, system-ui`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  const label = n.label.length > 30 ? n.label.slice(0, 29) + "…" : n.label;
+  ctx.fillStyle = "rgba(14,15,18,0.8)";
+  const w = ctx.measureText(label).width;
+  ctx.fillRect(x - w / 2 - 1.5, y + r + 2.5, w + 3, fontSize + 1.5);
+  ctx.fillStyle = unhealthy ? (status === "down" ? "#ff9b99" : "#f7c873") : visited ? "#c8d3ff" : strong ? C.ink : "#a3a8b1";
+  ctx.fillText(label, x, y + r + 3);
 }
 
 function tooltip(n: GNode): string {
