@@ -56,15 +56,15 @@ def graph_snapshot() -> dict[str, Any]:
     now = now_ms()
     params = {"now": now, "since": now - RECENT_MS}
     nodes: dict[str, dict] = {}
-    for q in NODE_QUERIES:
-        for r in rows(g, q, params):
-            p = r["n"].properties
-            if p.get("uid") in nodes:
-                continue
-            # `id` is the graph key (the uid); a node's own id property (INC-0042, ALR-...) becomes `ref`.
-            props = {("ref" if k == "id" else k): p[k] for k in KEEP if k in p}
-            nodes[p["uid"]] = {**props, "id": p["uid"], "type": r["type"], "label": _label(p, r["type"]),
-                               "team": r["team"]}
+    # One round trip instead of one per query: matters when the database is a network hop away.
+    for r in rows(g, " UNION ALL ".join(NODE_QUERIES), params):
+        p = r["n"].properties
+        if p.get("uid") in nodes:
+            continue
+        # `id` is the graph key (the uid); a node's own id property (INC-0042, ALR-...) becomes `ref`.
+        props = {("ref" if k == "id" else k): p[k] for k in KEEP if k in p}
+        nodes[p["uid"]] = {**props, "id": p["uid"], "type": r["type"], "label": _label(p, r["type"]),
+                           "team": r["team"]}
 
     for metric, q in (("pagerank", "CALL algo.pageRank('Service', 'DEPENDS_ON') YIELD node, score "
                                    "RETURN node.uid AS uid, score"),

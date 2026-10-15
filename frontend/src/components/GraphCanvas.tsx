@@ -39,7 +39,7 @@ function radius(n: N): number {
 function isLive(n: GNode, now: number): boolean {
   switch (n.type) {
     case "Alert":
-      return true; // the snapshot only contains firing alerts
+      return n.status !== "resolved"; // the snapshot only has firing alerts; approvals resolve them locally
     case "Deployment":
       return (n.at ?? 0) >= now - RECENT_MS && n.status === "live";
     case "Action":

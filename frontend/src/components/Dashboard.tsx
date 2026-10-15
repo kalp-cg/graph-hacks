@@ -51,6 +51,19 @@ function merge(prev: Data, next: GraphData): { data: Data; recovered: string[] }
   return { data: { nodes, links }, recovered };
 }
 
+/** Apply an approval's known effects to the live objects (same in-place style as `merge`). */
+function patchLive(data: Data, healed: Set<string>, resolved: Set<string>,
+                   breaker: { target: string; state: string } | null) {
+  for (const n of data.nodes) {
+    if (healed.has(n.id) && n.status !== "healthy") n.status = "healthy";
+    if (resolved.has(n.id)) n.status = "resolved";
+  }
+  if (!breaker) return;
+  for (const l of data.links) {
+    if (l.type === "DEPENDS_ON" && idOf(l.target) === breaker.target) l.breaker = breaker.state;
+  }
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<Data>({ nodes: [], links: [] });
   const dataRef = useRef(data);
@@ -131,7 +144,9 @@ export default function Dashboard() {
     const id = setInterval(() => {
       const t = Date.now();
       // Cost of downtime: integrate $/min of the unhealthy services while the incident is open.
-      if (costRef.current.open) setLost((l) => l + (costRef.current.perMin * (t - last)) / 60000);
+      // Compute the increment now: the updater runs later, when `last` has already moved on.
+      const add = costRef.current.open ? (costRef.current.perMin * (t - last)) / 60000 : 0;
+      if (add) setLost((l) => l + add);
       last = t;
       setNow(t);
     }, 500);
@@ -142,7 +157,8 @@ export default function Dashboard() {
   const alerts = useMemo(() => {
     const fired = new Map<string, string>();
     for (const l of data.links) if (l.type === "FIRED_ON") fired.set(idOf(l.source), idOf(l.target).replace(/^svc:/, ""));
-    return data.nodes.filter((n) => n.type === "Alert").map((n) => ({ ...n, target: fired.get(n.id) }));
+    return data.nodes.filter((n) => n.type === "Alert" && n.status !== "resolved")
+      .map((n) => ({ ...n, target: fired.get(n.id) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `version` marks in-place property updates
   }, [data, version]);
   const unhealthy = data.nodes.filter((n) => n.type === "Service" && n.status !== "healthy").length;
@@ -176,6 +192,20 @@ export default function Dashboard() {
     };
   }, [run.steps, run.running, activeStep]);
 
+  /** Show the result of an approval at once; the WebSocket refresh reconciles later (slow on free hosting). */
+  const applyApproval = (a: Action, out: Record<string, unknown>) => {
+    setActions((prev) => prev.map((x) => (x.uid === a.uid ? { ...x, status: "executed", outcome: String(out.outcome ?? "") } : x)));
+    const healed = new Set([...((out.recovered as string[]) ?? []),
+      ...(a.kind === "rollback" || a.kind === "scale_up" ? [`svc:${a.target}`] : [])]);
+    const resolved = new Set((out.resolved_alerts as string[]) ?? []);
+    const at = Date.now();
+    const breaker = a.kind === "open_breaker" ? "open" : a.kind === "scale_up" ? "closed" : null;
+    patchLive(dataRef.current, healed, resolved, breaker ? { target: `svc:${a.target}`, state: breaker } : null);
+    if (healed.size) setFlashes((f) => new Map([...f, ...[...healed].map((id) => [id, at] as [string, number])]));
+    setVersion((v) => v + 1);
+    void refreshGraph();
+  };
+
   const guard = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key);
     try {
@@ -205,8 +235,11 @@ export default function Dashboard() {
           onInject={(name) => guard(name, async () => { setActiveStep(null); await api.inject(name); })}
           onInvestigate={() => guard("run", async () => { setActiveStep(null); await api.run(provider || undefined); })}
           onReset={(keep) => guard("reset", async () => { setActiveStep(null); await api.reset(keep); })}
-          onApprove={(a) => guard(a.uid, () => api.approve(a.uid))}
-          onReject={(a) => guard(a.uid, () => api.reject(a.uid))}
+          onApprove={(a) => guard(a.uid, async () => applyApproval(a, await api.approve(a.uid)))}
+          onReject={(a) => guard(a.uid, async () => {
+            await api.reject(a.uid);
+            setActions((prev) => prev.map((x) => (x.uid === a.uid ? { ...x, status: "rejected" } : x)));
+          })}
           onFocus={focusOn}
         />
 
