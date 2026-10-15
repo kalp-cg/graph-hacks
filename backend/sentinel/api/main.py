@@ -4,6 +4,7 @@ Run: uvicorn sentinel.api.main:app --port 8000
 """
 import asyncio
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
@@ -123,6 +124,7 @@ async def health() -> dict:
         llm = f"unavailable: {exc}"
     providers = await asyncio.to_thread(available_providers)
     return {"falkordb": db, "graph": settings.graph_name, "llm": llm, "providers": providers,
+            "commit": (os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "")[:7],
             "tools": runs.toolbox.names if runs.toolbox else [], "running": runs.busy}
 
 
