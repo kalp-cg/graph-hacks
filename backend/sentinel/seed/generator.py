@@ -7,6 +7,7 @@ from falkordb import Graph
 from ..db import get_graph
 from .catalog import DATA_ACCESS, DATABASES, OBSERVABILITY, ON_CALL, PEOPLE, SERVICES, TEAMS
 from .history import build_history
+from .memory import build_memory
 
 SEED = 42
 DAY_MS = 24 * 60 * 60 * 1000
@@ -111,6 +112,7 @@ def seed_baseline(graph: Graph | None = None, now: int | None = None) -> dict[st
     wipe(graph)
     build_topology(graph, rng, now)
     build_history(graph, rng, now)
+    build_memory(graph, now)
     res = graph.query("MATCH (n) WITH count(n) AS nodes MATCH ()-[r]->() RETURN nodes, count(r) AS edges")
     nodes, edges = res.result_set[0]
     return {"nodes": nodes, "edges": edges}
