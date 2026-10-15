@@ -7,6 +7,7 @@ from falkordb import Graph
 from ..db import get_graph
 from .catalog import DATA_ACCESS, DATABASES, OBSERVABILITY, ON_CALL, PEOPLE, SERVICES, TEAMS
 from .history import build_history
+from .indexes import create_indexes
 from .memory import build_memory
 
 SEED = 42
@@ -110,6 +111,7 @@ def seed_baseline(graph: Graph | None = None, now: int | None = None) -> dict[st
     now = now or now_ms()
     rng = random.Random(SEED)
     wipe(graph)
+    create_indexes(graph)
     build_topology(graph, rng, now)
     build_history(graph, rng, now)
     build_memory(graph, now)
