@@ -13,6 +13,8 @@ export async function openApp(page: Page) {
   await page.goto("/");
   await expect(page.getByText(/falkordb · \d+ services/)).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("live", { exact: true })).toBeVisible();
+  // The header comes from /api/health; the graph is a separate (slower) request on remote hosting.
+  await expect(page.getByTestId("graph")).toHaveAttribute("data-ready", "true", { timeout: 60_000 });
 }
 
 export async function investigate(page: Page) {

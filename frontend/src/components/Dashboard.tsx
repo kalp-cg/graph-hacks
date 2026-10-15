@@ -330,7 +330,13 @@ export default function Dashboard() {
           onFocus={focusOn}
         />
 
-        <main className="dotgrid relative min-w-0 flex-1 overflow-hidden" data-testid="graph">
+        <main className="dotgrid relative min-w-0 flex-1 overflow-hidden" data-testid="graph"
+              data-ready={services.length > 0 ? "true" : "false"}>
+          {!offline && services.length === 0 && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-[12.5px] text-muted">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading the graph from FalkorDB
+            </div>
+          )}
           <GraphCanvas data={data} highlight={highlight} flashes={flashes} focus={focus} showContext={showContext}
                        selected={selectedId} onSelect={(n) => { setSelectedId(n?.id ?? null); setMenu(null); }}
                        onMenu={(node, x, y) => node.type === "Service" && setMenu({ node, x, y })} />
