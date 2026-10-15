@@ -1,0 +1,4 @@
+falkordb==1.8.0
+mcp==2.3.0
+python-dotenv==1.2.1
+pytest==9.1.1

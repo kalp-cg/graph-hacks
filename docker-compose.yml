@@ -1,0 +1,12 @@
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "${FALKORDB_PORT:-6380}:6379"   # Redis protocol (graph queries)
+      - "3000:3000"                       # FalkorDB Browser UI
+    volumes:
+      - falkordb_data:/var/lib/falkordb/data
+    restart: unless-stopped
+
+volumes:
+  falkordb_data:
