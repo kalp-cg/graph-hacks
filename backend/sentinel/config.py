@@ -19,5 +19,18 @@ class Settings:
     falkordb_password: str | None = os.getenv("FALKORDB_PASSWORD") or None
     graph_name: str = os.getenv("GRAPH_NAME", "sentinel")
 
+    llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")
+    llm_model: str = os.getenv("LLM_MODEL", "")
+    llm_max_steps: int = int(os.getenv("LLM_MAX_STEPS", "14"))
+    ollama_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:8b")
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "")
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+
+    cors_origins: tuple[str, ...] = tuple(
+        o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3001").split(",") if o.strip()
+    )
+
 
 settings = Settings()

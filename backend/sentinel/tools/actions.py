@@ -54,7 +54,7 @@ def propose_action(kind: str, target: str, reason: str, risk: str = "medium", ru
         return {"error": "bad_kind", "message": f"kind must be one of {sorted(KINDS)}"}
     if err := check_services(g, [target]):
         return err
-    risk = risk if risk in RISKS else "medium"
+    risk = str(risk).lower() if str(risk).lower() in RISKS else "medium"
 
     target_uid = f"svc:{target}"
     note = None

@@ -1,0 +1,151 @@
+"""LLM providers behind one tiny interface.
+
+Messages use the OpenAI chat shape internally:
+  {"role": "system"|"user"|"assistant"|"tool", "content": str, "tool_calls": [...], "tool_call_id": str}
+Each provider returns an `LLMReply` with plain text and normalized tool calls.
+"""
+import asyncio
+import json
+import logging
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Protocol
+
+import httpx
+
+from ..config import settings
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    args: dict[str, Any]
+
+
+@dataclass
+class LLMReply:
+    content: str = ""
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+    def as_message(self) -> dict:
+        msg: dict[str, Any] = {"role": "assistant", "content": self.content}
+        if self.tool_calls:
+            msg["tool_calls"] = [
+                {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": json.dumps(c.args)}}
+                for c in self.tool_calls
+            ]
+        return msg
+
+
+class LLM(Protocol):
+    name: str
+
+    async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply: ...
+
+
+def _parse_args(raw: Any) -> dict:
+    if isinstance(raw, dict):
+        return raw
+    try:
+        out = json.loads(raw or "{}")
+        return out if isinstance(out, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+async def _post_with_retry(client: httpx.AsyncClient, url: str, body: dict, headers: dict | None = None) -> dict:
+    """POST with backoff on rate limits / overload, which free tiers hit during demos."""
+    delay = 2.0
+    for attempt in range(4):
+        resp = await client.post(url, json=body, headers=headers or {})
+        if resp.status_code in (429, 500, 502, 503) and attempt < 3:
+            log.warning("LLM %s returned %s, retrying in %.0fs", url, resp.status_code, delay)
+            await asyncio.sleep(delay)
+            delay *= 2
+            continue
+        if resp.status_code >= 400:
+            raise RuntimeError(f"LLM error {resp.status_code}: {resp.text[:300]}")
+        return resp.json()
+    raise RuntimeError("unreachable")
+
+
+class OllamaLLM:
+    """Local model through Ollama's native /api/chat (lets us turn qwen3's hidden thinking off)."""
+
+    def __init__(self, model: str, url: str, num_ctx: int = 12288):
+        self.model, self.url, self.num_ctx = model, url.rstrip("/"), num_ctx
+        self.name = f"ollama:{model}"
+        self._client = httpx.AsyncClient(timeout=180)
+
+    def _convert(self, messages: list[dict]) -> list[dict]:
+        out = []
+        names: dict[str, str] = {}
+        for m in messages:
+            if m["role"] == "assistant" and m.get("tool_calls"):
+                calls = []
+                for c in m["tool_calls"]:
+                    names[c["id"]] = c["function"]["name"]
+                    calls.append({"function": {"name": c["function"]["name"],
+                                               "arguments": _parse_args(c["function"]["arguments"])}})
+                out.append({"role": "assistant", "content": m.get("content") or "", "tool_calls": calls})
+            elif m["role"] == "tool":
+                out.append({"role": "tool", "content": m["content"], "tool_name": names.get(m["tool_call_id"], "")})
+            else:
+                out.append({"role": m["role"], "content": m.get("content") or ""})
+        return out
+
+    async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
+        body = {"model": self.model, "messages": self._convert(messages), "tools": tools, "stream": False,
+                "think": False, "keep_alive": "30m", "options": {"num_ctx": self.num_ctx, "temperature": 0.2}}
+        data = await _post_with_retry(self._client, f"{self.url}/api/chat", body)
+        msg = data.get("message", {})
+        calls = [ToolCall(id=f"call_{uuid.uuid4().hex[:8]}", name=c["function"]["name"],
+                          args=_parse_args(c["function"].get("arguments")))
+                 for c in msg.get("tool_calls") or []]
+        return LLMReply(content=(msg.get("content") or "").strip(), tool_calls=calls)
+
+
+class OpenAICompatLLM:
+    """Any OpenAI-compatible chat API: Gemini (/v1beta/openai), Groq, OpenRouter, vLLM, OpenAI."""
+
+    def __init__(self, model: str, base_url: str, api_key: str, label: str = "openai"):
+        self.model, self.base_url, self.api_key = model, base_url.rstrip("/"), api_key
+        self.name = f"{label}:{model}"
+        self._client = httpx.AsyncClient(timeout=120)
+
+    async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
+        body = {"model": self.model, "messages": messages, "tools": tools, "temperature": 0.2}
+        data = await _post_with_retry(self._client, f"{self.base_url}/chat/completions", body,
+                                      {"Authorization": f"Bearer {self.api_key}"})
+        msg = data["choices"][0]["message"]
+        calls = [ToolCall(id=c.get("id") or f"call_{uuid.uuid4().hex[:8]}", name=c["function"]["name"],
+                          args=_parse_args(c["function"].get("arguments")))
+                 for c in msg.get("tool_calls") or []]
+        return LLMReply(content=(msg.get("content") or "").strip(), tool_calls=calls)
+
+
+GEMINI_OPENAI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+
+def make_llm(provider: str | None = None) -> LLM:
+    """Build the provider named by LLM_PROVIDER: ollama (default) | gemini | openai | autopilot."""
+    provider = (provider or settings.llm_provider).lower()
+    if provider == "ollama":
+        return OllamaLLM(settings.ollama_model, settings.ollama_url)
+    if provider == "gemini":
+        if not settings.gemini_api_key:
+            raise RuntimeError("GEMINI_API_KEY is not set")
+        return OpenAICompatLLM(settings.llm_model or "gemini-3.1-flash-lite", GEMINI_OPENAI_URL,
+                               settings.gemini_api_key, "gemini")
+    if provider == "openai":
+        if not (settings.openai_base_url and settings.openai_api_key and settings.llm_model):
+            raise RuntimeError("set OPENAI_BASE_URL, OPENAI_API_KEY and LLM_MODEL")
+        return OpenAICompatLLM(settings.llm_model, settings.openai_base_url, settings.openai_api_key)
+    if provider == "autopilot":
+        from .autopilot import Autopilot
+
+        return Autopilot()
+    raise RuntimeError(f"unknown LLM_PROVIDER {provider!r}")

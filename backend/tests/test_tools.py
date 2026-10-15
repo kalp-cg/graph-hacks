@@ -169,5 +169,5 @@ def test_mcp_registers_every_tool():
     assert names == {
         "get_active_alerts", "get_service_context", "trace_dependencies", "blast_radius",
         "find_common_cause", "recent_changes", "critical_services", "chokepoints",
-        "failure_path", "recall_similar",
+        "failure_path", "recall_similar", "propose_action", "conclude_investigation",
     }

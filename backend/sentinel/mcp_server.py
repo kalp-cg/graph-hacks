@@ -5,7 +5,7 @@ Works with any MCP client (our agent, Claude Desktop, Cursor, MCP Inspector).
 """
 from mcp.server.mcpserver import MCPServer
 
-from .tools import algorithms, memory, read, rootcause
+from .tools import actions, algorithms, incidents, memory, read, rootcause
 
 server = MCPServer(
     name="sentinelgraph",
@@ -13,8 +13,9 @@ server = MCPServer(
         "Tools over a FalkorDB graph of services, dependencies, deployments, people and past incidents. "
         "Investigate in this order: get_active_alerts -> find_common_cause on the alerting services -> "
         "recent_changes on the top candidate -> recall_similar -> get_service_context for the owner/on-call. "
-        "Use blast_radius / critical_services / chokepoints to explain impact. Every result includes the Cypher "
-        "it ran and the node/edge uids it touched; cite uids as evidence."
+        "Use blast_radius / critical_services / chokepoints to explain impact. Then propose_action (a human "
+        "approves it) and conclude_investigation. Every result includes the Cypher it ran and the node/edge "
+        "uids it touched; cite uids as evidence."
     ),
 )
 
@@ -77,6 +78,25 @@ def failure_path(from_service: str, to_service: str) -> dict:
 def recall_similar(services: list[str]) -> dict:
     """Past resolved incidents near these services, with root cause, fixes that worked and the runbook."""
     return memory.recall_similar(services)
+
+
+@server.tool()
+def propose_action(kind: str, target_service: str, reason: str, risk: str = "medium", run_id: str = "") -> dict:
+    """Propose a fix for a human to approve. Nothing changes until they do.
+
+    kind: rollback (most recent deploy of the service), open_breaker (isolate the service so callers fall back),
+    scale_up (add capacity), page_oncall (page the owning team's on-call engineer).
+    """
+    return actions.propose_action(kind, target_service, reason, risk, run_id or None)
+
+
+@server.tool()
+def conclude_investigation(root_cause_service: str, summary: str, similar_incident: str = "",
+                           run_id: str = "", steps_taken: int = 0) -> dict:
+    """Record the root-cause service and a one-paragraph summary on the incident, so it becomes memory."""
+    if not run_id:
+        return {"error": "no_run", "message": "conclude_investigation is only available inside an agent run"}
+    return incidents.conclude_incident(run_id, root_cause_service, summary, steps_taken, similar_incident or None)
 
 
 def main() -> None:
