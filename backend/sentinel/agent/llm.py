@@ -125,23 +125,50 @@ class OllamaLLM:
 class OpenAICompatLLM:
     """Any OpenAI-compatible chat API: Gemini (/v1beta/openai), Groq, OpenRouter, vLLM, OpenAI."""
 
-    def __init__(self, model: str, base_url: str, api_key: str, label: str = "openai"):
-        self.model, self.base_url, self.api_key = model, base_url.rstrip("/"), api_key
+    def __init__(self, model: str, base_url: str, api_key: str | list[str], label: str = "openai"):
+        self.model, self.base_url = model, base_url.rstrip("/")
+        if isinstance(api_key, list):
+            self.api_keys = [k.strip() for k in api_key if k.strip()]
+        else:
+            self.api_keys = [k.strip() for k in str(api_key).split(",") if k.strip()]
+        self.key_index = 0
         self.name = f"{label}:{model}"
         self._client = httpx.AsyncClient(timeout=120)
 
+    @property
+    def current_key(self) -> str:
+        return self.api_keys[self.key_index] if self.api_keys else ""
+
+    def rotate_key(self) -> str:
+        if len(self.api_keys) > 1:
+            self.key_index = (self.key_index + 1) % len(self.api_keys)
+            log.warning("Rotated to API key #%d/%d", self.key_index + 1, len(self.api_keys))
+        return self.current_key
+
     async def chat(self, messages: list[dict], tools: list[dict]) -> LLMReply:
         body = {"model": self.model, "messages": messages, "tools": tools, "temperature": 0.2}
-        data = await _post_with_retry(self._client, f"{self.base_url}/chat/completions", body,
-                                      {"Authorization": f"Bearer {self.api_key}"})
-        msg = data["choices"][0]["message"]
-        raw = msg.get("tool_calls") or []
-        for c in raw:  # every call needs an id so tool results can refer to it
-            c.setdefault("id", f"call_{uuid.uuid4().hex[:8]}")
-            c.setdefault("type", "function")
-        calls = [ToolCall(id=c["id"], name=c["function"]["name"], args=_parse_args(c["function"].get("arguments")))
-                 for c in raw]
-        return LLMReply(content=(msg.get("content") or "").strip(), tool_calls=calls, raw_tool_calls=raw or None)
+        attempts = max(len(self.api_keys), 1)
+        last_exc: Exception | None = None
+        for _ in range(attempts):
+            headers = {"Authorization": f"Bearer {self.current_key}"}
+            try:
+                data = await _post_with_retry(self._client, f"{self.base_url}/chat/completions", body, headers)
+                msg = data["choices"][0]["message"]
+                raw = msg.get("tool_calls") or []
+                for c in raw:  # every call needs an id so tool results can refer to it
+                    c.setdefault("id", f"call_{uuid.uuid4().hex[:8]}")
+                    c.setdefault("type", "function")
+                calls = [ToolCall(id=c["id"], name=c["function"]["name"], args=_parse_args(c["function"].get("arguments")))
+                         for c in raw]
+                return LLMReply(content=(msg.get("content") or "").strip(), tool_calls=calls, raw_tool_calls=raw or None)
+            except Exception as exc:
+                last_exc = exc
+                if len(self.api_keys) > 1 and ("429" in str(exc) or "rate limit" in str(exc).lower()):
+                    self.rotate_key()
+                    continue
+                raise
+        if last_exc:
+            raise last_exc
 
 
 GEMINI_OPENAI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -155,12 +182,14 @@ def make_llm(provider: str | None = None) -> LLM:
     if provider == "gemini":
         if not settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY is not set")
-        return OpenAICompatLLM(settings.llm_model or "gemini-3.1-flash-lite", GEMINI_OPENAI_URL,
-                               settings.gemini_api_key, "gemini")
+        keys = [k.strip() for k in settings.gemini_api_key.split(",") if k.strip()]
+        model = settings.llm_model if (settings.llm_model and "gemini" in settings.llm_model) else "gemini-flash-latest"
+        return OpenAICompatLLM(model, GEMINI_OPENAI_URL, keys, "gemini")
     if provider == "openai":
         if not (settings.openai_base_url and settings.openai_api_key and settings.llm_model):
             raise RuntimeError("set OPENAI_BASE_URL, OPENAI_API_KEY and LLM_MODEL")
-        return OpenAICompatLLM(settings.llm_model, settings.openai_base_url, settings.openai_api_key)
+        keys = [k.strip() for k in settings.openai_api_key.split(",") if k.strip()]
+        return OpenAICompatLLM(settings.llm_model, settings.openai_base_url, keys)
     if provider == "autopilot":
         from .autopilot import Autopilot
 

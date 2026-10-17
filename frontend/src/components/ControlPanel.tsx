@@ -74,9 +74,12 @@ export default function ControlPanel(p: Props) {
       <Section title="Agent">
         <select value={p.provider} onChange={(e) => p.onProvider(e.target.value)} disabled={p.running}
                 data-testid="provider"
-                className="mb-2 w-full rounded-md border border-line bg-raised px-2 py-1.5 text-[12px] text-ink outline-none focus:border-line-strong">
+                className="mb-1 w-full rounded-md border border-line bg-raised px-2 py-1.5 text-[12px] text-ink outline-none focus:border-line-strong">
           {p.providers.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
+        <p className="mb-2 text-[10.5px] text-faint">
+          ⚡ Includes multi-key pool rotation & Autopilot failover.
+        </p>
         <button onClick={p.onInvestigate} disabled={locked || p.alerts.length === 0} data-testid="investigate"
                 className="flex w-full items-center justify-center gap-2 rounded-md bg-brand py-2 text-[13px] font-semibold text-[#1a0d06] hover:brightness-110 disabled:bg-raised disabled:text-faint">
           {p.running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Investigating</> : "Investigate"}

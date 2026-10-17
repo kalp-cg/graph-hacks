@@ -41,8 +41,12 @@ export default function AgentTrail({ run, incidents, activeStep, onStep, onFocus
         <div className="thin-scroll flex-1 overflow-y-auto px-4 py-3" data-testid="trail">
           {!run.runId && <EmptyTrail />}
           {run.fallback && (
-            <div className="mb-3 rounded-md border border-warn/30 bg-warn/[0.06] px-2.5 py-2 text-[11.5px] text-warn">
-              {run.fallback}
+            <div className="mb-3 rounded-md border border-warn/30 bg-warn/[0.08] p-2.5 text-[11.5px] text-warn">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <span>⚡</span>
+                <span>Zero-downtime failover active</span>
+              </div>
+              <div className="mt-1 text-faint leading-relaxed">{run.fallback}</div>
             </div>
           )}
           <ol className="relative">
