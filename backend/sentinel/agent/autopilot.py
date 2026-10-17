@@ -121,7 +121,8 @@ class Autopilot:
         blast = last.get("blast_radius") or {}
         if not isinstance(blast, dict):
             blast = {}
-        by_tier = blast.get("by_tier") if isinstance(blast.get("by_tier"), dict) else {}
+        raw_tier = blast.get("by_tier")
+        by_tier: dict[str, Any] = raw_tier if isinstance(raw_tier, dict) else {}
         impact = (f"{blast.get('count')} upstream services at risk ({', '.join(f'{v} {k}' for k, v in by_tier.items())})."
                   if blast and blast.get("count") is not None else f"{len(services)} alerting services.")
         memory = (f"Repeat of **{repeat['id']}** ({repeat['title']}); last time it took {repeat['steps_taken']} steps."

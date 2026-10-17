@@ -13,7 +13,7 @@ from typing import Any, Protocol
 
 import httpx
 
-from ..config import settings
+from sentinel.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +74,8 @@ async def _post_with_retry(client: httpx.AsyncClient, url: str, body: dict, head
                     wait_s = max(float(retry_header), delay)
                 except (ValueError, TypeError):
                     pass
+            if wait_s > 4.0:
+                raise RuntimeError(f"Rate limited by {url} (wait {wait_s:.1f}s), falling over")
             log.warning("LLM %s returned %s, retrying in %.1fs", url, resp.status_code, wait_s)
             await asyncio.sleep(wait_s)
             delay = max(delay * 2, wait_s + 1.0)

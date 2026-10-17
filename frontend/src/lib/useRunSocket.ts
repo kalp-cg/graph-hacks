@@ -112,7 +112,13 @@ export function useRunSocket(onEvent: (e: RunEvent) => void) {
       closedByUs = true;
       clearTimeout(retry);
       clearInterval(ping);
-      socket?.close();
+      if (socket) {
+        if (socket.readyState === WebSocket.CONNECTING) {
+          socket.onopen = () => socket?.close();
+        } else {
+          socket.close();
+        }
+      }
     };
   }, []);
 
