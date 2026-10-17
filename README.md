@@ -372,6 +372,7 @@ remote hosting; FalkorDB 4.x rejected a query style the dev build accepted.
   - **Track 01: Agents That Act on Connected Data** (Primary)
   - **Track 02: Agent Memory and Coordination** (Graph topological memory)
 - **Demo Video:** [https://youtu.be/Ntb5FxvD-8E](https://youtu.be/Ntb5FxvD-8E)
+- **Technical Blog Post (AirPods 5 Side Prize):** [How I Built an AI Incident Commander That Thinks in Graphs (DEV Community)](https://dev.to/0xkalp/how-i-built-an-ai-incident-commander-that-thinks-in-graphs-and-solves-3-am-outages-in-90s-2lc9)
 - **Live Deployment:** [https://graph-hacks-alpha.vercel.app](https://graph-hacks-alpha.vercel.app)
 - **Graph Engine:** FalkorDB Cloud (ap-south-1) with native GraphBLAS matrix acceleration
 - **AI Assistant Disclosure (Rule 11):** Developed with AI-assisted pair programming (Antigravity / Claude) for testing and boilerplate. All graph modeling, Cypher path traversal logic, algorithm selection (PageRank & Betweenness), and MCP tool architecture were designed and verified by our team.
